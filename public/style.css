@@ -155,6 +155,8 @@ main { padding: 0 16px 24px; }
 .etat.avant { background: var(--vert-clair); color: var(--vert); }
 .etat.encours { background: var(--orange-clair); color: var(--orange); }
 .etat.fini { background: var(--fond); color: var(--gris); }
+.etat.vente { background: var(--or-clair); color: var(--or); }
+.badge.VT { background: #e0f2fe; color: #0369a1; }
 .statut { font-weight: 700; padding: 1px 7px; border-radius: 6px; color: #fff; }
 .plus { width: 100%; margin-top: 4px; padding: 12px; border-radius: 12px; border: 1px dashed var(--bord); background: transparent; font-weight: 600; }
 .vide { text-align: center; color: var(--gris); padding: 40px 10px; }

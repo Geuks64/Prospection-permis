@@ -95,3 +95,15 @@ avec carte, suivi des prospects, nouveautés, courriers à imprimer et export Ex
   - Courriers = étape 3 faite : bouton ✉️ (liste filtrée, max 150) ou depuis la fiche ;
     texte modifiable avant impression ; « Marquer Courrier envoyé » (POST /api/suivi {ids, s}).
 - Note : le conteneur Claude ne joint pas non plus cdnjs (carte non testable en local).
+- **Ventes DVF (2026-11-07)** — 2e source de prospects, choix utilisateur « maisons + locaux » :
+  `ventes.py` (appelé par `robot.py`) lit `files.data.gouv.fr/geo-dvf/latest/csv/<an>/departements/<dep>.csv.gz`
+  (54, 55, 88 ; **57 absent de DVF** : livre foncier d'Alsace-Moselle). Données publiées avec retard :
+  au 2026-11-07 la dernière année dispo est **2025** (ventes jusqu'à fin déc. 2025). On garde les
+  12 derniers mois DISPONIBLES ; mutations Vente/Adjudication avec 1 maison (± dépendances) ou 1-2
+  locaux, sans appartement. Fiches `src: "V"`, `t: "VT"`, `bien` maison|local, `prix`, `sb`, `pp`,
+  `st`, `pm2`, `med` (médiane €/m² commune, ≥ 5 ventes, sinon département + `med_dep`), `ratio`,
+  `nat_v`. Lien vente ↔ permis sur la même parcelle (`cle_parcelle`) : permis `achat` {d, prix, id},
+  vente `pc` [ids]. 1er passage : `vu` = date de vente (pas de faux « nouveaux »).
+  App : catégories HO `achat` / `achat_local` (note : ratio prix, adjudication, grande surface,
+  permis lié, ancienneté), filtre période non appliqué aux ventes, courrier « Au nouveau
+  propriétaire » (mention DVF / DGFiP). Outil de test : `outils/test_dvf.py` + `test-dvf.yml`.

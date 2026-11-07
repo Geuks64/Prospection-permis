@@ -26,6 +26,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from ventes import lier_ventes_permis, lire_ventes
+
 # ---------------------------------------------------------------------------
 # Réglages
 # ---------------------------------------------------------------------------
@@ -377,21 +379,35 @@ def main():
     geocoder_tout(fiches)
     enrichir_societes(fiches)
 
+    # Ventes immobilières récentes (DVF) : 2e source de prospects
+    try:
+        ventes, derniere_vente = lire_ventes()
+        lier_ventes_permis(fiches, ventes)
+    except Exception as e:  # noqa: BLE001 - les permis restent publiés même si DVF est en panne
+        log(f"  ⚠️ Ventes DVF indisponibles : {e}")
+        ventes, derniere_vente = [], ""
+
     # Date de première apparition (pour les « nouveautés »)
     vus = charger(VUS, {})
     premiere_fois = not vus
     for f in fiches:
         f["vu"] = vus.setdefault(f["id"], aujourd_hui.isoformat())
+    # 1re fois que les ventes arrivent : on ne les affiche pas toutes comme « nouvelles »
+    premieres_ventes = not any(k.startswith("V") for k in vus)
+    for v in ventes:
+        v["vu"] = vus.setdefault(v["id"], v["da"] if premieres_ventes else aujourd_hui.isoformat())
+    fiches += sorted(ventes, key=lambda v: v["da"], reverse=True)
     ids = {f["id"] for f in fiches}
     ecrire(VUS, {k: v for k, v in vus.items() if k in ids})
 
     # (certaines dates saisies sont dans le futur : on les ignore pour la date affichée)
-    dates = sorted(f["da"] for f in fiches if f.get("da") and f["da"] <= aujourd_hui.isoformat())
+    dates = sorted(f["da"] for f in fiches if f.get("da") and f["da"] <= aujourd_hui.isoformat() and f["src"] != "V")
     resultat = {
         "maj": aujourd_hui.isoformat(),
         "depuis": limite,
         "derniere_autorisation": dates[-1] if dates else "",
         "premier_passage": premiere_fois,
+        "derniere_vente": derniere_vente,
         "permis": fiches,
     }
     ecrire(SORTIE, resultat, compact=True)
@@ -408,7 +424,8 @@ def main():
             r.write(f"### Robot de collecte\n- **{len(fiches)} dossiers** (autorisés depuis le {limite})\n"
                     f"- Par type : {par_type}\n- Nouveaux aujourd'hui : {nouveaux}\n"
                     f"- Dernière autorisation dans les données : {resultat['derniere_autorisation']}\n"
-                    f"- Placés sur la carte : {sum(1 for f in fiches if 'lat' in f)}\n")
+                    f"- Placés sur la carte : {sum(1 for f in fiches if 'lat' in f)}\n"
+                    f"- Ventes DVF (maisons + locaux) : {len(ventes)} (jusqu'au {derniere_vente or '—'})\n")
 
 
 if __name__ == "__main__":

@@ -48,6 +48,7 @@ function distanceToul(f) {
 
 // Catégorie du projet, vue par HO (sert à la note, aux services et au courrier)
 function categorieHO(f) {
+  if (f.src === "V") return f.bien === "maison" ? "achat" : "achat_local";
   if (f.t === "PD") return "demolition";
   if (f.t === "PA") return "amenagement";
   const transformation = [2, 3, 4].includes(f.nat) || f.tt > 0;
@@ -68,6 +69,8 @@ const SERVICES_PAR_CATEGORIE = {
   local_travaux: ["debarras", "curage", "nettoyage", "evacuation", "ouvertures", "plomberie", "electricite"],
   local_neuf: ["terrassement", "dalle", "nettoyage_fin", "evacuation"],
   amenagement: ["terrassement", "murets", "terrasse", "evacuation"],
+  achat: ["debarras", "curage", "nettoyage", "ouvertures", "maconnerie", "plomberie", "electricite", "toiture", "facade"],
+  achat_local: ["debarras", "curage", "nettoyage", "evacuation", "ouvertures", "electricite", "plomberie"],
 };
 
 // Société qui achète / rénove pour revendre ou louer : client potentiel régulier
@@ -97,6 +100,8 @@ function noteHO(f) {
     logements_neufs: [18, "Programme de logements neufs : nettoyage de fin de chantier à proposer"],
     local_neuf: [10, "Bâtiment d'activité neuf : terrassement, nettoyage de fin de chantier"],
     amenagement: [10, "Lotissement / aménagement : terrassement, murets"],
+    achat: [45, "Maison achetée récemment : débarras, curage, nettoyage avant rénovation"],
+    achat_local: [40, "Local commercial acheté : curage et remise à nu avant réaménagement"],
   }[cat];
   p += base[0];
   raisons.push(base[1]);
@@ -106,14 +111,27 @@ function noteHO(f) {
   if (f.ldem > 0 && f.t !== "PD") { p += 10; raisons.push(`${f.ldem} logement(s) démoli(s)`); }
   if ((f.opt || []).includes("surelevation") || (f.opt || []).includes("niveau")) { p += 10; raisons.push("Surélévation / niveau en plus"); }
 
-  const ch = typeof chantier === "function" ? chantier(f) : "avant";
-  if (ch === "avant") { p += 25; raisons.push("Chantier pas encore commencé : c'est le bon moment"); }
-  else if (ch === "encours") { p += 3; raisons.push("Chantier déjà commencé : proposer la suite (artisans, nettoyage)"); }
-  else { p -= 60; raisons.push("Travaux terminés"); }
-
   const age = (Date.now() - new Date(f.da || "2000-01-01").getTime()) / 864e5;
-  if (age < 90) { p += 15; raisons.push("Autorisé il y a moins de 3 mois"); }
-  else if (age < 180) p += 5;
+  if (f.src === "V") {
+    // Ventes : prix au m² comparé à la commune = indice de maison à rénover
+    if (f.ratio && f.ratio < 0.6) { p += 35; raisons.push(`Vendue ${Math.round((1 - f.ratio) * 100)} % sous le prix moyen : sans doute à vider et à rénover`); }
+    else if (f.ratio && f.ratio < 0.8) { p += 20; raisons.push(`Vendue ${Math.round((1 - f.ratio) * 100)} % sous le prix moyen : travaux probables`); }
+    else if (f.ratio && f.ratio > 1.2) { p -= 10; raisons.push("Vendue au-dessus du prix moyen : sans doute en bon état"); }
+    if (f.nat_v === "Adjudication") { p += 15; raisons.push("Vendue aux enchères : souvent un bien à vider"); }
+    if (f.bien === "maison" && f.sb >= 150) { p += 10; raisons.push(`Grande maison (${f.sb} m²) : beaucoup à débarrasser`); }
+    if (f.bien === "local" && f.sb >= 200) { p += 10; raisons.push(`Grand local (${f.sb} m²)`); }
+    if (f.pc?.length) { p += 25; raisons.push("Le nouveau propriétaire a déposé un dossier de travaux"); }
+    if (age < 365) { p += 10; raisons.push("Achat de moins d'un an"); }
+    else if (age > 540) { p -= 10; raisons.push("Achat de plus de 18 mois : travaux peut-être déjà faits"); }
+  } else {
+    const ch = typeof chantier === "function" ? chantier(f) : "avant";
+    if (ch === "avant") { p += 25; raisons.push("Chantier pas encore commencé : c'est le bon moment"); }
+    else if (ch === "encours") { p += 3; raisons.push("Chantier déjà commencé : proposer la suite (artisans, nettoyage)"); }
+    else { p -= 60; raisons.push("Travaux terminés"); }
+    if (age < 90) { p += 15; raisons.push("Autorisé il y a moins de 3 mois"); }
+    else if (age < 180) p += 5;
+    if (f.achat) { p += 15; raisons.push(`Bien acheté le ${f.achat.d.split("-").reverse().join("/")} : nouveau propriétaire qui prépare des travaux`); }
+  }
 
   if (!f.dem && f.dville && f.ville && f.dville.toUpperCase() !== f.ville.toUpperCase() && cat !== "maison_neuve") {
     p += 15; raisons.push(`Le demandeur habite ailleurs (${f.dville}) : sans doute un achat récent`);
@@ -152,6 +170,8 @@ function accroche(f) {
     local_travaux: `Bonjour, HO Démolition à Toul. Pour les travaux de votre local à ${lieu}, nous réalisons le débarras, le curage et le nettoyage pour remettre les lieux à nu avant travaux, et nous pouvons vous mettre en relation avec des artisans.`,
     local_neuf: `Bonjour, HO Démolition à Toul. Pour votre nouveau bâtiment à ${lieu}, nous proposons le nettoyage de fin de chantier et la mise en relation avec des artisans locaux (terrassement, dalle…).`,
     amenagement: `Bonjour, HO Démolition à Toul. Pour l'aménagement de votre terrain à ${lieu}, nous vous mettons en relation avec des artisans locaux : terrassement, murets, pavés, évacuation.`,
+    achat: `Bonjour, HO Démolition à Toul. Vous avez acheté une maison à ${lieu} : avant de vous installer ou de rénover, on peut tout vider, curer et nettoyer, puis vous mettre en relation avec des artisans de confiance (maçonnerie, plomberie, électricité, toiture…). Un seul interlocuteur, devis gratuit.`,
+    achat_local: `Bonjour, HO Démolition à Toul. Vous avez acheté un local à ${lieu} : nous réalisons le débarras, le curage et le nettoyage pour remettre les lieux à nu, et nous vous mettons en relation avec des artisans pour l'aménagement. Devis gratuit.`,
   }[noteHO(f).categorie];
 }
 
@@ -200,11 +220,24 @@ function paragraphesCourrier(f) {
       `Nous avons appris votre projet d'aménagement ${lieu}.`,
       "Nous vous mettons en relation avec des artisans locaux pour le terrassement, les murets, les pavés et l'évacuation des déchets.",
     ],
+    achat: [
+      `Vous êtes devenu propriétaire de la maison située ${lieu} : félicitations !`,
+      "Avant d'emménager ou de rénover, il faut souvent vider les lieux : c'est notre métier. Débarras complet (maison, cave, grenier, garage), évacuation des meubles et encombrants, curage intérieur et nettoyage.",
+      suite,
+    ],
+    achat_local: [
+      `Vous avez acquis le local situé ${lieu}.`,
+      "Nous réalisons le débarras, le curage et le nettoyage pour remettre les lieux à nu avant votre réaménagement, avec évacuation des déchets.",
+      suite,
+    ],
   }[noteHO(f).categorie];
 }
 
 // Destinataire du courrier (lignes de l'adresse)
 function destinataire(f) {
+  if (f.src === "V") {
+    return [f.bien === "maison" ? "Au nouveau propriétaire" : "Au propriétaire", joli(f.adr), `${f.cp || ""} ${(f.ville || "").toUpperCase()}`.trim()].filter(Boolean);
+  }
   if (f.dem) {
     const lignes = [f.ent?.nom || f.dem];
     if (f.ent?.dir) lignes.push(`À l'attention de ${f.ent.dir.replace(/\s*\(.*\)$/, "")}`);
@@ -222,7 +255,7 @@ function destinataire(f) {
 
 function htmlCourrier(f) {
   const date = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
-  const objet = { demolition: "votre projet de démolition", maison_neuve: "votre projet de construction", logements_neufs: "votre programme de construction", local_neuf: "votre projet de construction", amenagement: "votre projet d'aménagement" }[noteHO(f).categorie] || "vos travaux";
+  const objet = { demolition: "votre projet de démolition", maison_neuve: "votre projet de construction", logements_neufs: "votre programme de construction", local_neuf: "votre projet de construction", amenagement: "votre projet d'aménagement", achat: "votre nouvelle maison", achat_local: "votre nouveau local" }[noteHO(f).categorie] || "vos travaux";
   const madame = "Madame, Monsieur,";
   return `<section class="lettre">
     <div class="lettre-tete">
@@ -240,7 +273,9 @@ function htmlCourrier(f) {
       <p>Nous vous prions d'agréer, Madame, Monsieur, nos salutations distinguées.</p>
       <p class="lettre-signature">L'équipe ${HO.nom}</p>
     </div>
-    <div class="lettre-pied">Nous vous écrivons car votre projet figure dans la liste publique des autorisations d'urbanisme (base Sitadel du ministère chargé du Logement, n° ${echapper(f.num)}). Votre adresse n'est utilisée que pour ce courrier. Si vous ne souhaitez plus être contacté, il suffit de nous le dire par téléphone ou par e-mail : nous la supprimerons.</div>
+    <div class="lettre-pied">${f.src === "V"
+      ? "Nous vous écrivons car cette vente figure dans les données publiques des ventes immobilières (base DVF de la Direction générale des Finances publiques)."
+      : `Nous vous écrivons car votre projet figure dans la liste publique des autorisations d'urbanisme (base Sitadel du ministère chargé du Logement, n° ${echapper(f.num)}).`} Votre adresse n'est utilisée que pour ce courrier. Si vous ne souhaitez plus être contacté, il suffit de nous le dire par téléphone ou par e-mail : nous la supprimerons.</div>
   </section>`;
 }
 
