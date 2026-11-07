@@ -1,0 +1,19 @@
+# Étape 0 — Test des données Sitadel.
+# À lancer à la main : onglet Actions → « Test des données » → Run workflow.
+# Le rapport s'affiche dans le résumé du run (en bas de la page du run).
+name: Test des données
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Analyser les données Sitadel
+        run: python3 test_donnees.py
