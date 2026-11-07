@@ -1,0 +1,15 @@
+# Outil : test des DPE (ADEME) sur 54, 55, 57, 88.
+name: Test DPE
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python3 outils/test_dpe.py
