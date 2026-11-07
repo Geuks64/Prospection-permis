@@ -8,9 +8,11 @@
 <meta name="apple-mobile-web-app-title" content="HO Prospection">
 <meta name="theme-color" content="#18181b">
 <title>HO Démolition · Prospection</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css">
+<!-- Journal interne (invisible) : chargé en premier pour attraper toutes les erreurs -->
+<script src="journal.js"></script>
+<link rel="stylesheet" href="/lib/leaflet/leaflet.css">
+<link rel="stylesheet" href="/lib/leaflet/MarkerCluster.css">
+<link rel="stylesheet" href="/lib/leaflet/MarkerCluster.Default.css">
 <link rel="stylesheet" href="style.css">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icones/icone-180.png">
@@ -122,8 +124,8 @@
 <div class="voile" id="voile" hidden></div>
 <aside class="fiche" id="fiche" hidden aria-modal="true" role="dialog"></aside>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
+<script src="/lib/leaflet/leaflet.js"></script>
+<script src="/lib/leaflet/leaflet.markercluster.js"></script>
 <script src="ho.js"></script>
 <script src="app.js"></script>
 </body>

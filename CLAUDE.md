@@ -130,3 +130,23 @@ avec carte, suivi des prospects, nouveautés, courriers à imprimer et export Ex
   déploiement). Envois hors-ligne mis en file (`localStorage` « attente ») et renvoyés au retour du
   réseau. La page de connexion est renvoyée en **401** (jamais mise en cache). Sur iPhone : Safari
   → Partager → « Sur l'écran d'accueil » (il faut se reconnecter une fois dans l'appli installée).
+- **Anciens Workers supprimés (2026-11-07)** : `prospection-permis` et `hodemolition` (*.workers.dev)
+  supprimés via l'API (workflow ponctuel retiré ensuite). Restent : Worker `tiktok-resume` + projet
+  Pages `hodemolition`.
+- **Journal interne + rapports automatiques (2026-11-07)** — demandé par l'utilisateur pour que
+  Claude reçoive tous les bugs et analyses :
+  - `public/journal.js` (chargé en 1er, invisible) : erreurs JS, promesses, fichiers non chargés,
+    erreurs serveur, carte indisponible, démarrage > 5 s + compteurs d'usage (fiche, statut:*,
+    source:*, onglet:*, export, courriers-prepares, impression, accroche-copiee, recherche,
+    envoi-hors-ligne, ouverture…). Envoi `sendBeacon` toutes les 60 s / à la mise en arrière-plan.
+  - Worker : `POST /api/journal`, `GET /api/journal`, `POST /api/journal/vider` (KV `journal` =
+    300 entrées fusionnées max, `compteurs` = 60 jours).
+  - `outils/rapport.py` + `.github/workflows/rapport.yml` (chaque jour 06:41 UTC + manuel) : se
+    connecte avec `APP_PASSWORD`, analyse journal + fraîcheur des données, ouvre une **Issue GitHub
+    label `rapport-auto`** (si erreurs/alertes, chaque lundi, ou lancement manuel) puis vide le journal.
+  - Robot : `alerter()` → `alertes.md` → Issue « ⚠️ Robot : alertes » ; échec du robot ou du
+    déploiement → Issue « ❌ … a échoué ».
+  - **Pour la session suivante : lire les Issues ouvertes `rapport-auto` du dépôt, corriger, fermer.**
+- Leaflet + markercluster désormais **hébergés dans `public/lib/leaflet/`** (plus de cdnjs) : carte
+  testée en local (OK). Géocodage : résultats hors du département refusés, positions hors Lorraine
+  du cache refaites ; accents « abîmés » des fichiers Sitadel réparés (`reparer_accents`).

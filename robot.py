@@ -50,11 +50,21 @@ FICHIERS = [
     ("D", "1a9a2f0c-56fe-4e69-84a7-fbbda2121f02", "permis de démolir"),
     ("A", "96883f50-538b-41f9-a059-c6eb97e6a23a", "permis d'aménager"),
 ]
-GEO = "https://data.geopf.fr/geocodage/search"   # géocodeur gratuit de l'IGN (Géoplateforme)
+GEO = "https://data.geopf.fr/geocodage/search"
+LORRAINE = (47.7, 49.8, 4.7, 7.8)   # cadre lat min, lat max, lon min, lon max (contrôle des positions)   # géocodeur gratuit de l'IGN (Géoplateforme)
 
 
 def log(*a):
     print(*a, flush=True)
+
+
+# Problèmes à signaler (écrits dans alertes.md → ticket GitHub ouvert par le workflow)
+ALERTES = []
+
+
+def alerter(message):
+    log(f"  ⚠️ {message}")
+    ALERTES.append(message)
 
 
 # ---------------------------------------------------------------------------
@@ -89,8 +99,25 @@ def vrai(v):
     return str(v).strip().lower() in ("true", "1", "oui")
 
 
+def reparer_accents(s):
+    """Certains fichiers de l'État contiennent des accents « abîmés » (UTF-8 encodé deux fois) :
+    « SAVONNIÃ\x88RES » → « SAVONNIÈRES »."""
+    for _ in range(3):
+        if not any(c in s for c in "ÃÂ"):
+            break
+        try:
+            s = s.encode("latin-1").decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            try:
+                s = s.encode("cp1252").decode("utf-8")
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                break
+    # caractères de contrôle restants
+    return "".join(c for c in s if c.isprintable())
+
+
 def nettoyer(v):
-    return " ".join((v or "").split())
+    return reparer_accents(" ".join((v or "").split()))
 
 
 def convertir(source, l):
@@ -208,11 +235,17 @@ def geocoder(cle):
     """cle = 'adresse|code INSEE|ville'. Renvoie [lat, lon, précision] (précision 'a' adresse,
     'r' rue, 'c' commune) ou None."""
     adresse, insee, ville = cle.split("|")
+
+    def bon_departement(feat):
+        # Sécurité : on refuse un résultat situé dans un autre département (homonyme ailleurs en France)
+        code = (feat or {}).get("properties", {}).get("citycode", "")
+        return bool(feat) and (not insee or code[:2] == insee[:2])
+
     if adresse:
         feat = requete_geo({"q": adresse, "citycode": insee, "limit": 1}) if insee else None
-        if not feat:
+        if not bon_departement(feat):
             feat = requete_geo({"q": f"{adresse} {ville}", "limit": 1})
-        if feat and feat["properties"].get("score", 0) >= 0.4:
+        if bon_departement(feat) and feat["properties"].get("score", 0) >= 0.4:
             lon, lat = feat["geometry"]["coordinates"]
             typ = feat["properties"].get("type")
             precision = "a" if typ == "housenumber" else ("r" if typ in ("street", "locality") else "c")
@@ -233,6 +266,8 @@ def cle_geo(f):
 
 def geocoder_tout(fiches):
     cache = charger(CACHE_GEO, {})
+    # On oublie les anciennes positions hors Lorraine (erreurs de géocodage) pour les refaire
+    cache = {k: v for k, v in cache.items() if v is None or (LORRAINE[0] < v[0] < LORRAINE[1] and LORRAINE[2] < v[1] < LORRAINE[3])}
     a_faire = sorted({cle_geo(f) for f in fiches} - cache.keys())
     log(f"\n== Géocodage : {len(a_faire)} nouvelles adresses ({len(cache)} déjà connues)")
     erreurs = 0
@@ -247,6 +282,8 @@ def geocoder_tout(fiches):
                 log(f"  {n}/{len(a_faire)}")
     if erreurs:
         log(f"  {erreurs} adresses en échec (réessayées la prochaine fois)")
+    if erreurs > 100:
+        alerter(f"Géocodage : {erreurs} adresses en échec (service IGN en difficulté ?)")
     # On ne garde dans le cache que les adresses encore utiles (le fichier reste léger)
     utiles = {cle_geo(f) for f in fiches}
     cache = {k: v for k, v in cache.items() if k in utiles}
@@ -325,6 +362,8 @@ def enrichir_societes(fiches):
                 erreurs += 1
     if erreurs:
         log(f"  {erreurs} sociétés en échec (réessayées la prochaine fois)")
+    if erreurs > 100:
+        alerter(f"Annuaire des entreprises : {erreurs} sociétés en échec")
     cache = {k: v for k, v in cache.items() if k in set(sirens)}
     ecrire(CACHE_ENT, cache)
     for f in fiches:
@@ -386,7 +425,7 @@ def main():
         ventes, derniere_vente = lire_ventes()
         lier_ventes_permis(fiches, ventes)
     except Exception as e:  # noqa: BLE001 - les permis restent publiés même si DVF est en panne
-        log(f"  ⚠️ Ventes DVF indisponibles : {e}")
+        alerter(f"Ventes DVF indisponibles : {e}")
         ventes, derniere_vente = [], ""
 
     # Diagnostics énergie récents (DPE) : 3e source de prospects
@@ -395,7 +434,7 @@ def main():
         dpes, dernier_dpe = lire_dpe()
         lier_dpe(dpes, fiches + ventes)
     except Exception as e:  # noqa: BLE001 - le reste est publié même si l'API DPE est en panne
-        log(f"  ⚠️ DPE indisponibles : {e}")
+        alerter(f"DPE indisponibles : {e}")
         dpes, dernier_dpe = [], ""
 
     # Date de première apparition (pour les « nouveautés »)
@@ -431,6 +470,24 @@ def main():
         "dernier_dpe": dernier_dpe,
         "permis": fiches,
     }
+    # Contrôles de cohérence
+    nb_permis = sum(1 for f in fiches if f["src"] not in ("V", "E"))
+    if nb_permis < 3000:
+        alerter(f"Seulement {nb_permis} permis (habituellement ~5 000) : fichier Sitadel incomplet ?")
+    if resultat["derniere_autorisation"] and (aujourd_hui - dt.date.fromisoformat(resultat["derniere_autorisation"])).days > 75:
+        alerter(f"Dernière autorisation au {resultat['derniere_autorisation']} : Sitadel n'est plus mis à jour ?")
+    if not ventes:
+        alerter("Aucune vente DVF récupérée")
+    if not dpes:
+        alerter("Aucun DPE récupéré")
+    hors_zone = sum(1 for f in fiches if f.get("lat") is not None
+                    and not (LORRAINE[0] < f["lat"] < LORRAINE[1] and LORRAINE[2] < f["lon"] < LORRAINE[3]))
+    if hors_zone > 20:
+        alerter(f"{hors_zone} dossiers placés hors de Lorraine sur la carte (géocodage à vérifier)")
+    if ALERTES:
+        with open("alertes.md", "w", encoding="utf-8") as fa:
+            fa.write("\n".join(f"- {a}" for a in ALERTES) + "\n")
+
     ecrire(SORTIE, resultat, compact=True)
     taille = os.path.getsize(SORTIE) / 1e6
     log(f"\n== Terminé : {len(fiches)} dossiers → {SORTIE} ({taille:.1f} Mo)")

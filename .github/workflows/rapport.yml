@@ -1,0 +1,30 @@
+# Rapport interne (invisible dans l'appli) : chaque matin, analyse le journal de l'appli
+# (erreurs, lenteurs, usage) et la fraîcheur des données, puis ouvre un ticket GitHub
+# « rapport-auto » s'il y a quelque chose à corriger (et un bilan chaque lundi).
+# À la main (Run workflow) : ticket ouvert dans tous les cas.
+name: Rapport interne
+
+on:
+  schedule:
+    - cron: "41 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  rapport:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Analyse et ticket
+        env:
+          APP_URL: https://hodemolition.pages.dev
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORCER: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
+        run: python3 outils/rapport.py

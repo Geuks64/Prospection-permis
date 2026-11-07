@@ -14,6 +14,9 @@
 //   POST /api/suivi       {id, s, n}          → enregistre statut (s) et note (n) d'un dossier
 //   POST /api/suivi       {ids: [...], s}     → même statut pour plusieurs dossiers (courriers)
 //   POST /api/vue         {maj}               → marque les nouveautés comme vues
+//   POST /api/journal     {evenements, compteurs, appareil} → journal interne (bugs, usage)
+//   GET  /api/journal                         → lecture du journal (rapport quotidien)
+//   POST /api/journal/vider                   → vide les erreurs après un rapport
 //   tout le reste                             → fichiers de public/ (si connecté)
 // =============================================================================
 
@@ -150,6 +153,72 @@ async function routeVue(req: Request, env: Env): Promise<Response> {
   return json({ ok: true, vue: maj });
 }
 
+// ----- Journal interne (bugs, lenteurs, usage) -------------------------------
+// Invisible dans l'appli : l'appli envoie ses erreurs et compteurs d'usage, le workflow
+// « Rapport » (outils/rapport.py) les lit chaque jour et ouvre un ticket GitHub à analyser.
+
+type Entree = { type: string; msg: string; detail?: string; n: number; premier: string; dernier: string; appareil?: string };
+type Compteurs = Record<string, Record<string, number>>; // jour → nom → nombre
+
+const MAX_ENTREES = 300;
+const JOURS_COMPTEURS = 60;
+
+async function routeJournal(req: Request, env: Env, chemin: string): Promise<Response> {
+  if (req.method === "GET") {
+    return json({
+      journal: (await env.SUIVI.get("journal", "json")) || [],
+      compteurs: (await env.SUIVI.get("compteurs", "json")) || {},
+    });
+  }
+  if (req.method !== "POST") return json({ erreur: "Méthode non permise" }, 405);
+
+  if (chemin === "/api/journal/vider") {
+    await env.SUIVI.put("journal", "[]");
+    return json({ ok: true });
+  }
+
+  const c = (await req.json().catch(() => ({}))) as {
+    evenements?: { type?: string; msg?: string; detail?: string; t?: string }[];
+    compteurs?: Record<string, number>;
+    appareil?: string;
+  };
+  const maintenant = new Date().toISOString();
+  const appareil = String(c.appareil || "").slice(0, 300);
+
+  // Erreurs / événements : les identiques sont fusionnés (avec un compteur)
+  const evts = (c.evenements || []).slice(0, 50);
+  if (evts.length) {
+    const journal = ((await env.SUIVI.get("journal", "json")) as Entree[] | null) || [];
+    for (const e of evts) {
+      const type = String(e.type || "inconnu").slice(0, 40);
+      const msg = String(e.msg || "").slice(0, 300);
+      const t = String(e.t || maintenant).slice(0, 30);
+      const existant = journal.find((x) => x.type === type && x.msg === msg);
+      if (existant) {
+        existant.n++;
+        existant.dernier = t;
+        existant.appareil = appareil || existant.appareil;
+      } else {
+        journal.push({ type, msg, detail: String(e.detail || "").slice(0, 1500), n: 1, premier: t, dernier: t, appareil });
+      }
+    }
+    journal.sort((a, b) => b.dernier.localeCompare(a.dernier));
+    await env.SUIVI.put("journal", JSON.stringify(journal.slice(0, MAX_ENTREES)));
+  }
+
+  // Compteurs d'usage par jour (ex. « fiche » : 12, « courriers » : 3)
+  const noms = Object.entries(c.compteurs || {}).slice(0, 80);
+  if (noms.length) {
+    const tous = ((await env.SUIVI.get("compteurs", "json")) as Compteurs | null) || {};
+    const jour = maintenant.slice(0, 10);
+    const duJour = (tous[jour] = tous[jour] || {});
+    for (const [nom, n] of noms) duJour[String(nom).slice(0, 40)] = (duJour[String(nom).slice(0, 40)] || 0) + (Number(n) || 0);
+    for (const j of Object.keys(tous).sort().slice(0, -JOURS_COMPTEURS)) delete tous[j];
+    await env.SUIVI.put("compteurs", JSON.stringify(tous));
+  }
+  return json({ ok: true });
+}
+
 // ----- Point d'entrée --------------------------------------------------------
 
 export default {
@@ -183,6 +252,7 @@ export default {
     try {
       if (chemin === "/api/suivi") return await routeSuivi(req, env);
       if (chemin === "/api/vue") return await routeVue(req, env);
+      if (chemin.startsWith("/api/journal")) return await routeJournal(req, env, chemin);
       if (chemin.startsWith("/api/")) return json({ erreur: "Route inconnue" }, 404);
     } catch (e) {
       console.log("Erreur :", (e as Error).stack ?? String(e));

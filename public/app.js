@@ -76,11 +76,14 @@ async function api(chemin, corps) {
     r = await fetch(chemin, corps ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) } : {});
   } catch (e) {
     // Pas de réseau : un envoi (statut, note…) est mis en attente et sera renvoyé plus tard
-    if (corps) return mettreEnAttente(chemin, corps);
+    if (corps) { JOURNAL.compter("envoi-hors-ligne"); return mettreEnAttente(chemin, corps); }
     throw e;
   }
   if (r.status === 401) { location.reload(); throw new Error("Session expirée"); }
-  if (!r.ok) throw new Error(`Erreur ${r.status}`);
+  if (!r.ok) {
+    JOURNAL.noter("serveur", `${chemin} → HTTP ${r.status}`);
+    throw new Error(`Erreur ${r.status}`);
+  }
   return r.json();
 }
 
@@ -310,6 +313,7 @@ document.querySelectorAll(".puces[data-filtre]").forEach((zone) => {
 });
 
 function changementFiltres() {
+  JOURNAL.compter("filtre");
   sauver("filtres_ho", { ...E.filtres, nouveaux: false });
   E.limite = 60;
   dessinerFiltres();
@@ -370,7 +374,7 @@ function couleurPoint(f) {
 }
 
 function dessinerCarte() {
-  if (!window.L) { $("#carte").innerHTML = '<div class="vide">Carte indisponible (pas de connexion ?)</div>'; return; }
+  if (!window.L) { JOURNAL.noter("carte", "Bibliothèque de la carte (Leaflet) non chargée"); $("#carte").innerHTML = '<div class="vide">Carte indisponible (pas de connexion ?)</div>'; return; }
   if (!E.carte) {
     E.carte = L.map("carte", { zoomControl: true }).setView([48.75, 6.3], 8);
     // Repère du siège de HO à Toul
@@ -400,7 +404,10 @@ function dessinerCarte() {
     points.push(m);
   }
   E.calque.addLayers(points);
-  if (points.length) E.carte.fitBounds(E.calque.getBounds(), { padding: [20, 20], maxZoom: 15 });
+  // (cadrage calculé sur les points eux-mêmes : le chargement progressif du calque est asynchrone)
+  // (et seulement sur les points situés en Lorraine : un point mal placé ne doit pas dézoomer la carte)
+  const enLorraine = points.map((m) => m.getLatLng()).filter((p) => p.lat > 47.7 && p.lat < 49.8 && p.lng > 4.7 && p.lng < 7.8);
+  if (enLorraine.length) E.carte.fitBounds(L.latLngBounds(enLorraine), { padding: [20, 20], maxZoom: 15 });
 }
 
 $("#me-localiser").addEventListener("click", () => {
@@ -432,6 +439,7 @@ function rafraichir() {
 document.querySelectorAll(".onglets button").forEach((b) => b.addEventListener("click", () => {
   document.querySelectorAll(".onglets button").forEach((x) => x.classList.toggle("actif", x === b));
   E.onglet = b.dataset.onglet;
+  JOURNAL.compter(`onglet:${E.onglet}`);
   E.limite = 60;
   rafraichir();
   window.scrollTo(0, 0);
@@ -440,13 +448,14 @@ document.querySelectorAll(".onglets button").forEach((b) => b.addEventListener("
 let minuteur;
 $("#recherche").addEventListener("input", (e) => {
   clearTimeout(minuteur);
-  minuteur = setTimeout(() => { E.filtres.q = e.target.value; E.limite = 60; rafraichir(); }, 200);
+  minuteur = setTimeout(() => { E.filtres.q = e.target.value; E.limite = 60; JOURNAL.compter("recherche"); rafraichir(); }, 200);
 });
 $("#bouton-filtres").addEventListener("click", () => { $("#filtres").hidden = !$("#filtres").hidden; });
 $("#fermer-filtres").addEventListener("click", () => { $("#filtres").hidden = true; });
 // Boutons Tout / Permis / Ventes
 document.querySelectorAll("#sources button").forEach((b) => b.addEventListener("click", () => {
   E.filtres.source = b.dataset.source;
+  JOURNAL.compter(`source:${b.dataset.source}`);
   changementFiltres();
 }));
 function compterSources() {
@@ -537,6 +546,7 @@ function blocDPE(f) {
 }
 
 function ouvrirFiche(id) {
+  JOURNAL.compter("fiche");
   const f = E.permis.find((x) => x.id === id);
   if (!f) return;
   const suivi = suiviDe(f) || {};
@@ -650,6 +660,7 @@ function ouvrirFiche(id) {
     const b = e.target.closest(".puce");
     if (!b) return;
     statut = statut === b.dataset.s ? "" : b.dataset.s; // 2e appui = retirer le statut
+    JOURNAL.compter(`statut:${statut || "retiré"}`);
     document.querySelectorAll("#choix-statut .puce").forEach((x) => {
       const actif = x.dataset.s === statut;
       x.classList.toggle("actif", actif);
@@ -661,6 +672,7 @@ function ouvrirFiche(id) {
   $("#enregistrer").addEventListener("click", () => enregistrer(id, statut));
   $("#courrier-un").addEventListener("click", () => { fermerFiche(); ouvrirCourriers([f]); });
   $("#copier-accroche").addEventListener("click", async (e) => {
+    JOURNAL.compter("accroche-copiee");
     try { await navigator.clipboard.writeText($("#texte-accroche").textContent); e.target.textContent = "Copié ✓"; } catch (x) { e.target.textContent = "Copie impossible"; }
   });
   $("#fermer-fiche").addEventListener("click", fermerFiche);
@@ -693,6 +705,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#fic
 
 // ----- Export CSV (s'ouvre dans Excel) ---------------------------------------
 function exporter() {
+  JOURNAL.compter("export");
   const lignes = E.resultats;
   if (!lignes.length) { alert("Aucun dossier à exporter."); return; }
   const entetes = ["Intérêt HO", "Points", "Distance de Toul (km)", "À proposer", "Numéro", "Type", "Projet", "Autorisé le", "État du chantier", "Chantier ouvert le", "Terminé le",
@@ -731,6 +744,7 @@ const MAX_COURRIERS = 150;
 let courriersEnCours = [];
 
 function ouvrirCourriers(liste) {
+  JOURNAL.compter("courriers-prepares", Math.min(liste.length, MAX_COURRIERS));
   if (!liste.length) { alert("Aucun dossier dans la liste."); return; }
   if (liste.length > MAX_COURRIERS &&
       !confirm(`${liste.length} dossiers : seuls les ${MAX_COURRIERS} premiers (les plus intéressants selon le tri) seront préparés. Continuer ?`)) return;
@@ -747,7 +761,7 @@ function fermerCourriers() {
   rafraichir();
 }
 $("#bouton-courriers").addEventListener("click", () => ouvrirCourriers(E.resultats));
-$("#imprimer").addEventListener("click", () => window.print());
+$("#imprimer").addEventListener("click", () => { JOURNAL.compter("impression"); window.print(); });
 $("#retour-courriers").addEventListener("click", fermerCourriers);
 $("#marquer-courriers").addEventListener("click", async (e) => {
   const ids = courriersEnCours.map(cleSuivi);
@@ -772,6 +786,8 @@ if ("serviceWorker" in navigator) {
 
 async function demarrer() {
   $("#logo-entete").innerHTML = LOGO_SVG;
+  const debut = performance.now();
+  JOURNAL.compter(navigator.onLine ? "ouverture" : "ouverture-hors-ligne");
   try {
     const [rep, suivi] = await Promise.all([
       fetch("/data/permis.json"),
@@ -804,7 +820,11 @@ async function demarrer() {
     $("#recherche").value = E.filtres.q;
     dessinerFiltres();
     rafraichir();
+    // Lenteur au démarrage (au-delà de 5 s) : à analyser
+    const duree = Math.round(performance.now() - debut);
+    if (duree > 5000) JOURNAL.noter("lenteur", `Démarrage en ${Math.round(duree / 1000)} s`, `${E.permis.length} dossiers`);
   } catch (e) {
+    JOURNAL.noter("demarrage", e.message, e.stack || "");
     $("#infos-donnees").textContent = "Erreur de chargement";
     $("#vue-liste").innerHTML = `<div class="vide">Erreur : ${echapper(e.message)}<br>Vérifie ta connexion puis recharge la page.</div>`;
   }

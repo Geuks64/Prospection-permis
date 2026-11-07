@@ -11,6 +11,10 @@ on:
   workflow_dispatch:
   workflow_call:
 
+permissions:
+  contents: read
+  issues: write   # pour signaler un échec (ticket « rapport-auto »)
+
 concurrency:
   group: deploy
   cancel-in-progress: false
@@ -91,3 +95,14 @@ jobs:
             | jq -r '.result.subdomain // empty')
           echo "Appli en ligne : https://$SUB"
           echo "### ✅ Appli en ligne : https://$SUB" >> "$GITHUB_STEP_SUMMARY"
+
+      # Signalement automatique (lu par Claude pour corriger)
+      - name: Ticket si le déploiement a échoué
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create rapport-auto --repo "$GITHUB_REPOSITORY" --color D93F0B --force || true
+          gh issue create --repo "$GITHUB_REPOSITORY" --label rapport-auto \
+            --title "❌ Le déploiement de l'appli a échoué ($(date +%d/%m/%Y))" \
+            --body "Journal : $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

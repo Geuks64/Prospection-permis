@@ -15,13 +15,11 @@ const CACHE_TUILES = "ho-tuiles";
 const MAX_TUILES = 2000;
 
 const APP = [
-  "/", "/style.css", "/ho.js", "/app.js", "/manifest.webmanifest",
+  "/", "/style.css", "/journal.js", "/ho.js", "/app.js", "/manifest.webmanifest",
   "/icones/icone-180.png", "/icones/icone-192.png",
-  "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css",
-  "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js",
-  "https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css",
-  "https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css",
-  "https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js",
+  // Bibliothèque de la carte, hébergée dans l'appli (public/lib/leaflet)
+  "/lib/leaflet/leaflet.css", "/lib/leaflet/leaflet.js", "/lib/leaflet/MarkerCluster.css",
+  "/lib/leaflet/MarkerCluster.Default.css", "/lib/leaflet/leaflet.markercluster.js",
 ];
 
 self.addEventListener("install", (e) => {

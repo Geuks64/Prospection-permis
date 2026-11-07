@@ -19,6 +19,7 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: write   # pour enregistrer les nouvelles données dans le dépôt
+      issues: write     # pour signaler un problème (ticket « rapport-auto »)
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -41,7 +42,31 @@ jobs:
             git push origin HEAD:main
           fi
 
+      # Signalement automatique (lu par Claude pour corriger) : alertes de données ou échec
+      - name: Ticket si alerte sur les données
+        if: always() && hashFiles('alertes.md') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create rapport-auto --repo "$GITHUB_REPOSITORY" --color D93F0B --force || true
+          gh issue create --repo "$GITHUB_REPOSITORY" --label rapport-auto \
+            --title "⚠️ Robot : alertes sur les données ($(date +%d/%m/%Y))" \
+            --body "$(printf 'Run : %s/%s/actions/runs/%s\n\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"; cat alertes.md)" \
+          || gh issue create --repo "$GITHUB_REPOSITORY" --title "⚠️ Robot : alertes sur les données" --body-file alertes.md
+      - name: Ticket si le robot a échoué
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create rapport-auto --repo "$GITHUB_REPOSITORY" --color D93F0B --force || true
+          gh issue create --repo "$GITHUB_REPOSITORY" --label rapport-auto \
+            --title "❌ Le robot de collecte a échoué ($(date +%d/%m/%Y))" \
+            --body "Journal : $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
   deploiement:
     needs: collecte
+    permissions:
+      contents: read
+      issues: write
     uses: ./.github/workflows/deploy.yml
     secrets: inherit
