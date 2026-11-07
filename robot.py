@@ -385,7 +385,8 @@ def main():
     ids = {f["id"] for f in fiches}
     ecrire(VUS, {k: v for k, v in vus.items() if k in ids})
 
-    dates = sorted(f["da"] for f in fiches if f.get("da"))
+    # (certaines dates saisies sont dans le futur : on les ignore pour la date affichée)
+    dates = sorted(f["da"] for f in fiches if f.get("da") and f["da"] <= aujourd_hui.isoformat())
     resultat = {
         "maj": aujourd_hui.isoformat(),
         "depuis": limite,
