@@ -265,3 +265,9 @@ body.mode-courriers #courriers { display: block; }
     page-break-after: always; break-after: page; font-size: 11pt; }
   .lettre-dest { margin-left: 100mm; }
 }
+
+/* ----- Choix rapide Tout / Permis / Ventes ----- */
+.sources { display: flex; margin: 0 16px 8px; padding: 3px; gap: 3px; background: var(--carte); border: 1px solid var(--bord); border-radius: 12px; }
+.sources button { flex: 1; border: 0; background: transparent; border-radius: 9px; padding: 8px 4px; font-weight: 600; font-size: 14px; }
+.sources button small { font-weight: 500; opacity: .75; font-size: 12px; }
+.sources button.actif { background: var(--bleu); color: var(--sur-bleu); }

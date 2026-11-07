@@ -51,6 +51,13 @@
   <button id="bouton-export" title="Exporter la liste en CSV (Excel)">⤓ Excel</button>
 </section>
 
+<!-- Choix rapide de la source : tout / permis / ventes -->
+<div class="sources" id="sources">
+  <button data-source="tout" class="actif">Tout</button>
+  <button data-source="permis">🏗️ Permis <small id="nb-permis"></small></button>
+  <button data-source="ventes">🏠 Ventes <small id="nb-ventes"></small></button>
+</div>
+
 <section class="filtres" id="filtres" hidden>
   <div class="groupe"><h3>Intérêt pour HO</h3><div class="puces" data-filtre="interet"></div></div>
   <div class="groupe"><h3>Autour de Toul</h3><div class="puces" data-filtre="rayon"></div></div>

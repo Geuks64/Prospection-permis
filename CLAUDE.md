@@ -107,3 +107,5 @@ avec carte, suivi des prospects, nouveautés, courriers à imprimer et export Ex
   App : catégories HO `achat` / `achat_local` (note : ratio prix, adjudication, grande surface,
   permis lié, ancienneté), filtre période non appliqué aux ventes, courrier « Au nouveau
   propriétaire » (mention DVF / DGFiP). Outil de test : `outils/test_dvf.py` + `test-dvf.yml`.
+  - Sélecteur **Tout / 🏗️ Permis / 🏠 Ventes** en haut de la liste (filtre `source`, avec compteurs ;
+    s'applique aussi à la carte, aux courriers et à l'export).

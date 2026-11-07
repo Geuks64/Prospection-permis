@@ -37,7 +37,7 @@ const CHOIX = {
 const UNIQUES = new Set(["dem", "periode", "statut", "rayon"]);
 
 function filtresParDefaut() {
-  return { q: "", deps: [], dem: "tous", types: [], projet: [], chantier: [], options: [], interet: [], rayon: "tout", periode: "12", statut: "tous", tri: "chaleur", nouveaux: false };
+  return { q: "", deps: [], dem: "tous", types: [], projet: [], chantier: [], options: [], interet: [], rayon: "tout", periode: "12", statut: "tous", tri: "chaleur", nouveaux: false, source: "tout" };
 }
 
 // ----- État de l'appli -------------------------------------------------------
@@ -134,13 +134,17 @@ function moisAvant(n) {
   return d.toISOString().slice(0, 10);
 }
 
-function filtrer(pourSuivi) {
+// source : "tout", "permis" ou "ventes" (boutons en haut de la liste) ; on peut la forcer pour les compteurs
+function filtrer(pourSuivi, sourceForcee) {
   const F = E.filtres;
+  const source = sourceForcee || F.source || "tout";
   const q = F.q.trim().toLowerCase();
   const depuis = moisAvant(Number(F.periode) || 12);
   const res = E.permis.filter((f) => {
     const s = E.suivi[f.id]?.s || "";
     if (pourSuivi) return !!(s || E.suivi[f.id]?.n);
+    if (source === "permis" && f.src === "V") return false;
+    if (source === "ventes" && f.src !== "V") return false;
     if (F.nouveaux && !estNouveau(f)) return false;
     if (F.deps.length && !F.deps.includes(f.dep)) return false;
     if (F.dem === "particulier" && !estParticulier(f)) return false;
@@ -195,6 +199,7 @@ function dessinerFiltres() {
     }).join("");
   });
   $("#tri").value = E.filtres.tri;
+  document.querySelectorAll("#sources button").forEach((b) => b.classList.toggle("actif", b.dataset.source === (E.filtres.source || "tout")));
   const n = nbFiltresActifs();
   $("#nb-filtres").hidden = !n;
   $("#nb-filtres").textContent = n;
@@ -319,6 +324,8 @@ function rafraichir() {
     : `${total} dossier${total > 1 ? "s" : ""}` + (E.onglet === "carte" && surCarte < total ? ` (${surCarte} placés sur la carte)` : "");
   const cacherBarre = E.onglet === "suivi";
   $(".barre").hidden = cacherBarre;
+  $("#sources").hidden = cacherBarre;
+  compterSources();
   if (cacherBarre) $("#filtres").hidden = true;
   $("#vue-liste").hidden = E.onglet === "carte";
   $("#vue-carte").hidden = E.onglet !== "carte";
@@ -341,6 +348,19 @@ $("#recherche").addEventListener("input", (e) => {
 });
 $("#bouton-filtres").addEventListener("click", () => { $("#filtres").hidden = !$("#filtres").hidden; });
 $("#fermer-filtres").addEventListener("click", () => { $("#filtres").hidden = true; });
+// Boutons Tout / Permis / Ventes
+document.querySelectorAll("#sources button").forEach((b) => b.addEventListener("click", () => {
+  E.filtres.source = b.dataset.source;
+  changementFiltres();
+}));
+function compterSources() {
+  if (E.onglet === "suivi") return;
+  for (const src of ["permis", "ventes"]) {
+    const n = filtrer(false, src).length;
+    $(`#nb-${src}`).textContent = n.toLocaleString("fr-FR");
+  }
+}
+
 $("#reinitialiser").addEventListener("click", () => { E.filtres = { ...filtresParDefaut(), q: E.filtres.q }; changementFiltres(); });
 $("#tri").addEventListener("change", (e) => { E.filtres.tri = e.target.value; changementFiltres(); });
 
