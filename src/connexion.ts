@@ -11,6 +11,8 @@ export const PAGE_CONNEXION = `<!doctype html>
 <meta name="apple-mobile-web-app-title" content="HO Prospection">
 <meta name="theme-color" content="#18181b">
 <title>HO Démolition · Prospection</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icones/icone-180.png">
 <style>
   :root { --fond:#f4f6fb; --carte:#fff; --texte:#111827; --gris:#6b7280; --bleu:#18181b; --bord:#e5e7eb; }
   @media (prefers-color-scheme: dark) {

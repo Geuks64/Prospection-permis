@@ -27,6 +27,7 @@ import urllib.parse
 import urllib.request
 
 from dpe import lier_dpe, lire_dpe
+from groupes import regrouper
 from ventes import lier_ventes_permis, lire_ventes
 
 # ---------------------------------------------------------------------------
@@ -412,6 +413,10 @@ def main():
     for d in dpes:
         d["vu"] = vus.setdefault(d["id"], d["da"] if premiers_dpe else aujourd_hui.isoformat())
     fiches += sorted(dpes, key=lambda d: d["da"], reverse=True)
+
+    # Une même maison peut avoir un permis, une vente et un DPE : on les regroupe
+    log("\n== Regroupement par adresse")
+    regrouper(fiches)
     ids = {f["id"] for f in fiches}
     ecrire(VUS, {k: v for k, v in vus.items() if k in ids})
 

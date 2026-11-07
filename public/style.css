@@ -278,3 +278,14 @@ body.mode-courriers #courriers { display: block; }
 .etq-D { background: #f4e70f; color: #111; } .etq-E { background: #f0b40f; color: #111; }
 .etq-F { background: #eb8235; } .etq-G { background: #d7221f; }
 .badge.DPE { background: #fef3c7; color: #92400e; }
+
+/* ----- Prospects regroupés (même adresse) ----- */
+.signaux { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; font-size: 12px; color: var(--gris); }
+.signaux span { background: var(--or-clair); color: var(--or); border-radius: 6px; padding: 1px 6px; font-weight: 700; }
+.groupe-fiche { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+.groupe-fiche .sous-titre { width: 100%; }
+.groupe-fiche button { border: 1px solid var(--bord); background: var(--carte); border-radius: 10px; padding: 6px 10px; font-size: 13px; }
+.groupe-fiche button.actif { background: var(--bleu); color: var(--sur-bleu); border-color: var(--bleu); }
+
+/* ----- Mode hors-ligne ----- */
+.reseau { margin: 0 16px 8px; padding: 8px 12px; border-radius: 10px; background: #e0e7ff; color: #3730a3; font-size: 13px; font-weight: 600; }

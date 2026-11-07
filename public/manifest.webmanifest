@@ -1,0 +1,16 @@
+{
+  "name": "HO Démolition — Prospection",
+  "short_name": "HO Prospection",
+  "description": "Prospection chantiers : permis, ventes, diagnostics énergie — 54, 55, 57, 88",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#18181b",
+  "theme_color": "#18181b",
+  "lang": "fr",
+  "icons": [
+    { "src": "/icones/icone-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icones/icone-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icones/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

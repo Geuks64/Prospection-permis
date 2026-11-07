@@ -155,6 +155,17 @@ function noteHO(f) {
   }
   if (estInvestisseur(f)) { p += 10; raisons.push("Investisseur / marchand de biens : peut devenir un client régulier"); }
 
+  // Plusieurs signaux à la même adresse (permis + vente + DPE…) : prospect bien plus sûr
+  if (f.grp && typeof membres === "function") {
+    const genre = (m) => (m.src === "V" ? "vente" : m.src === "E" ? `DPE ${m.etq}` : "permis");
+    // seules les sources DIFFÉRENTES comptent (3 permis à la même adresse = 1 seul signal)
+    const autres = [...new Set(membres(f).map(genre))].filter((g) => g !== genre(f));
+    if (autres.length) {
+      p += 12 * autres.length;
+      raisons.push(`Autres signaux à cette adresse : ${autres.join(" + ")}`);
+    }
+  }
+
   const d = distanceToul(f);
   if (d != null) {
     if (d < 20) p += 10;

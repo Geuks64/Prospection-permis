@@ -12,6 +12,9 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css">
 <link rel="stylesheet" href="style.css">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icones/icone-180.png">
+<link rel="icon" href="/icones/icone-192.png">
 </head>
 <body>
 
@@ -26,6 +29,13 @@
   </div>
   <a class="bouton-discret" href="/api/deconnexion">Quitter</a>
 </header>
+
+<!-- Réseau : hors-ligne / envois en attente ; nouvelles données disponibles -->
+<div class="reseau" id="reseau" hidden></div>
+<div class="bandeau" id="maj-dispo" hidden>
+  <span>🔄 Nouvelles données disponibles</span>
+  <div class="bandeau-actions"><button onclick="location.reload()">Recharger</button></div>
+</div>
 
 <!-- Bandeau des nouveautés -->
 <div class="bandeau" id="bandeau" hidden>

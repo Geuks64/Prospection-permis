@@ -52,6 +52,7 @@ const E = {
   resultats: [],
   carte: null,
   calque: null,
+  groupes: new Map(), // grp → dossiers de la même adresse
 };
 
 // ----- Petites aides ---------------------------------------------------------
@@ -70,11 +71,76 @@ function chargerFiltres() {
   try { return { ...filtresParDefaut(), ...(JSON.parse(localStorage.getItem("filtres_ho")) || {}), nouveaux: false }; } catch (e) { return filtresParDefaut(); }
 }
 async function api(chemin, corps) {
-  const r = await fetch(chemin, corps ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) } : {});
+  let r;
+  try {
+    r = await fetch(chemin, corps ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) } : {});
+  } catch (e) {
+    // Pas de réseau : un envoi (statut, note…) est mis en attente et sera renvoyé plus tard
+    if (corps) return mettreEnAttente(chemin, corps);
+    throw e;
+  }
   if (r.status === 401) { location.reload(); throw new Error("Session expirée"); }
   if (!r.ok) throw new Error(`Erreur ${r.status}`);
   return r.json();
 }
+
+// ----- Mode hors-ligne : modifications en attente -----------------------------
+function lireAttente() {
+  try { return JSON.parse(localStorage.getItem("attente")) || []; } catch (e) { return []; }
+}
+function mettreEnAttente(chemin, corps) {
+  const liste = lireAttente();
+  liste.push({ chemin, corps });
+  sauver("attente", liste);
+  afficherReseau();
+  return reponseLocale(chemin, corps);
+}
+// Ce que le serveur aurait répondu (pour mettre l'écran à jour tout de suite)
+function reponseLocale(chemin, corps) {
+  const m = new Date().toISOString();
+  if (chemin === "/api/suivi" && corps.ids) {
+    const entrees = {};
+    for (const id of corps.ids) entrees[id] = { s: corps.s, n: E.suivi[id]?.n || "", m };
+    return { ok: true, entrees, horsLigne: true };
+  }
+  if (chemin === "/api/suivi") return { ok: true, entree: corps.s || corps.n ? { s: corps.s, n: corps.n, m } : null, horsLigne: true };
+  return { ok: true, horsLigne: true };
+}
+// Au démarrage hors-ligne : on réapplique les modifications en attente sur le suivi gardé en copie
+function appliquerAttente() {
+  for (const { chemin, corps } of lireAttente()) {
+    const r = reponseLocale(chemin, corps);
+    if (r.entrees) Object.assign(E.suivi, r.entrees);
+    else if (chemin === "/api/suivi") { if (r.entree) E.suivi[corps.id] = r.entree; else delete E.suivi[corps.id]; }
+    else if (chemin === "/api/vue") E.vue = corps.maj;
+  }
+}
+let envoiEnCours = false;
+async function envoyerAttente() {
+  if (envoiEnCours || !navigator.onLine) return;
+  envoiEnCours = true;
+  let liste = lireAttente();
+  while (liste.length) {
+    try {
+      const r = await fetch(liste[0].chemin, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(liste[0].corps) });
+      if (r.status >= 500) break; // serveur en panne : on réessaiera
+    } catch (e) { break; } // toujours pas de réseau
+    liste = liste.slice(1);
+    sauver("attente", liste);
+  }
+  envoiEnCours = false;
+  afficherReseau();
+}
+function afficherReseau() {
+  const n = lireAttente().length;
+  const zone = $("#reseau");
+  zone.hidden = navigator.onLine && !n;
+  zone.textContent = !navigator.onLine
+    ? `📴 Hors ligne — l'appli fonctionne avec les données gardées sur le téléphone${n ? ` (${n} modification${n > 1 ? "s" : ""} en attente)` : ""}`
+    : `⏳ ${n} modification${n > 1 ? "s" : ""} en attente d'envoi…`;
+}
+window.addEventListener("online", () => { afficherReseau(); envoyerAttente(); });
+window.addEventListener("offline", afficherReseau);
 
 // ----- Interprétation d'un dossier -------------------------------------------
 function chantier(f) {
@@ -88,6 +154,18 @@ const CHANTIER_NOM = { avant: "Pas commencé", encours: "Chantier en cours", fin
 const euros = (n) => (n || 0).toLocaleString("fr-FR") + " €";
 const estParticulier = (f) => !f.dem && !f.siret; // (acheteurs DVF : jamais publiés → comptés comme particuliers)
 const estNouveau = (f) => !!E.vue && f.vu > E.vue;
+
+// ----- Prospects regroupés (même maison : permis + vente + DPE…) -----------------
+// Le robot donne le même `grp` aux dossiers d'une même adresse ; le suivi est partagé.
+const cleSuivi = (f) => f.grp || f.id;
+const membres = (f) => (f.grp && E.groupes.get(f.grp)) || [f];
+function suiviDe(f) {
+  if (E.suivi[cleSuivi(f)]) return E.suivi[cleSuivi(f)];
+  // (suivi enregistré avant le regroupement, sur un dossier précis)
+  for (const m of membres(f)) if (E.suivi[m.id]) return E.suivi[m.id];
+  return null;
+}
+const NOM_SOURCE = (m) => ({ V: "Vente", E: `DPE ${m.etq || ""}`.trim() }[m.src] || m.t);
 
 function projet(f) {
   // Catégorie utilisée par le filtre « Projet »
@@ -144,8 +222,8 @@ function filtrer(pourSuivi, sourceForcee) {
   const q = F.q.trim().toLowerCase();
   const depuis = moisAvant(Number(F.periode) || 12);
   const res = E.permis.filter((f) => {
-    const s = E.suivi[f.id]?.s || "";
-    if (pourSuivi) return !!(s || E.suivi[f.id]?.n);
+    const s = suiviDe(f)?.s || "";
+    if (pourSuivi) return !!(s || suiviDe(f)?.n);
     if (source === "permis" && f.src === "V") return false;
     if (source === "ventes" && f.src !== "V") return false;
     if (source === "dpe" && f.src !== "E") return false;
@@ -180,9 +258,16 @@ function filtrer(pourSuivi, sourceForcee) {
     surface: (a, b) => ((b.sh || 0) + (b.sl || 0)) - ((a.sh || 0) + (a.sl || 0)),
     chaleur: (a, b) => noteHO(b).points - noteHO(a).points || (b.da || "").localeCompare(a.da || ""),
     proche: (a, b) => (distanceToul(a) ?? 999) - (distanceToul(b) ?? 999),
-    suivi: (a, b) => (E.suivi[b.id]?.m || "").localeCompare(E.suivi[a.id]?.m || ""),
+    suivi: (a, b) => (suiviDe(b)?.m || "").localeCompare(suiviDe(a)?.m || ""),
   }[tri];
-  return res.sort(cmp);
+  // Une seule carte par maison : on garde le dossier le plus intéressant de chaque groupe
+  const meilleur = new Map();
+  for (const f of res) {
+    if (!f.grp) continue;
+    const m = meilleur.get(f.grp);
+    if (!m || noteHO(f).points > noteHO(m).points) meilleur.set(f.grp, f);
+  }
+  return res.filter((f) => !f.grp || meilleur.get(f.grp) === f).sort(cmp);
 }
 
 function nbFiltresActifs() {
@@ -241,16 +326,22 @@ function distanceTexte(f) {
   return d == null ? "" : `à ${Math.round(d)} km de Toul`;
 }
 
+function autresSignaux(f) {
+  const autres = membres(f).filter((m) => m !== f);
+  return autres.length ? `<div class="signaux">🔗 ${autres.map((m) => `<span>+ ${echapper(NOM_SOURCE(m))}</span>`).join("")}</div>` : "";
+}
+
 function carteDossier(f) {
   const ch = chantier(f);
-  const s = E.suivi[f.id]?.s;
+  const s = suiviDe(f)?.s;
   return `<article class="dossier" data-id="${echapper(f.id)}">
     <div class="l1"><span class="badge ${f.t}">${f.t}</span><span class="projet">${echapper(libelle(f))}</span>${estNouveau(f) ? '<span class="nouveau">NOUVEAU</span>' : ""}</div>
+    ${autresSignaux(f)}
     <div class="adresse">${echapper(joli(f.adr) || joli(f.ld) || "Adresse non précisée")}</div>
     <div class="ville">${echapper(f.cp)} ${echapper(joli(f.ville))}${distanceTexte(f) ? " · " + distanceTexte(f) : ""}${f.dem ? `<br><b>${echapper(f.dem)}</b>` : ""}</div>
     <div class="l3">${badgeInteret(f)}${f.src === "E" ? `<span class="etq etq-${f.etq}">DPE ${f.etq}</span>` : `<span class="etat ${ch}">${CHANTIER_NOM[ch]}</span>`}<span>${{ V: "vendu le", E: "diagnostic du" }[f.src] || "autorisé le"} ${dateFr(f.da)}</span>
       ${s ? `<span class="statut" style="background:${STATUTS[s].couleur}">${STATUTS[s].nom}</span>` : ""}
-      ${E.suivi[f.id]?.n ? "<span>📝</span>" : ""}</div>
+      ${suiviDe(f)?.n ? "<span>📝</span>" : ""}</div>
   </article>`;
 }
 
@@ -273,7 +364,7 @@ $("#vue-liste").addEventListener("click", (e) => {
 
 // ----- Affichage : carte -----------------------------------------------------
 function couleurPoint(f) {
-  const s = E.suivi[f.id]?.s;
+  const s = suiviDe(f)?.s;
   if (s) return STATUTS[s].couleur;
   return { 3: "#dc2626", 2: "#f97316", 1: "#eab308", 0: "#9ca3af" }[noteHO(f).niveau];
 }
@@ -448,8 +539,9 @@ function blocDPE(f) {
 function ouvrirFiche(id) {
   const f = E.permis.find((x) => x.id === id);
   if (!f) return;
-  const suivi = E.suivi[id] || {};
+  const suivi = suiviDe(f) || {};
   const adr = adresseComplete(f);
+  const groupe = membres(f);
   const dest = f.lat != null ? `${f.lat},${f.lon}` : encodeURIComponent(adr);
   const geoportail = f.lat != null
     ? `https://www.geoportail.gouv.fr/carte?c=${f.lon},${f.lat}&z=19&l0=ORTHOIMAGERY.ORTHOPHOTOS::GEOPORTAIL:OGC:WMTS(1)&l1=CADASTRALPARCELS.PARCELLAIRE_EXPRESS::GEOPORTAIL:OGC:WMTS(1)&permalink=yes`
@@ -465,6 +557,8 @@ function ouvrirFiche(id) {
         <div class="sous-titre">${f.src === "V" ? `Vente du ${dateFr(f.da)} (DVF)` : f.src === "E" ? `Diagnostic énergie du ${dateFr(f.da)} (ADEME)` : `${TYPES[f.t] || f.t} n° ${echapper(f.num)}`}</div></div>
       <button class="fermer" id="fermer-fiche" aria-label="Fermer">✕</button>
     </div>
+    ${groupe.length > 1 ? `<div class="groupe-fiche"><div class="sous-titre">🔗 ${groupe.length} dossiers pour cette adresse (touche pour voir le détail) :</div>
+      ${groupe.map((m) => `<button class="${m === f ? "actif" : ""}" data-lien="${echapper(m.id)}"><b>${echapper(NOM_SOURCE(m))}</b> ${dateFr(m.da)}</button>`).join("")}</div>` : ""}
 
     <div class="bloc bloc-ho">
       <h3>🎯 Intérêt pour ${HO.nom}</h3>
@@ -574,13 +668,16 @@ function ouvrirFiche(id) {
 }
 
 async function enregistrer(id, statut) {
+  const f = E.permis.find((x) => x.id === id);
+  const cle = f ? cleSuivi(f) : id; // suivi partagé par tous les dossiers de la même adresse
   const note = $("#note").value.trim();
   const msg = $("#message-suivi");
   msg.textContent = "Enregistrement…";
   try {
-    const r = await api("/api/suivi", { id, s: statut, n: note });
-    if (r.entree) E.suivi[id] = r.entree; else delete E.suivi[id];
-    msg.textContent = "Enregistré ✓";
+    const r = await api("/api/suivi", { id: cle, s: statut, n: note });
+    if (r.entree) E.suivi[cle] = r.entree; else delete E.suivi[cle];
+    if (f) for (const m of membres(f)) if (m.id !== cle) delete E.suivi[m.id];
+    msg.textContent = r.horsLigne ? "📴 Enregistré sur le téléphone (envoi au retour du réseau)" : "Enregistré ✓";
   } catch (e) {
     msg.textContent = "⚠️ Pas enregistré : " + e.message;
   }
@@ -601,19 +698,19 @@ function exporter() {
   const entetes = ["Intérêt HO", "Points", "Distance de Toul (km)", "À proposer", "Numéro", "Type", "Projet", "Autorisé le", "État du chantier", "Chantier ouvert le", "Terminé le",
     "Logements créés", "Surface habitable créée (m²)", "Surface d'activité créée (m²)", "Comprend",
     "Adresse", "Lieu-dit", "Code postal", "Commune", "Département", "Demandeur", "SIRET",
-    "Domicile du demandeur", "Étiquette DPE", "Prix de vente (€)", "Prix au m² (€)", "Écart / moyenne commune (%)", "Dirigeant", "Siège de la société", "Parcelles", "Terrain (m²)", "Latitude", "Longitude", "Nouveau", "Statut", "Note", "Suivi mis à jour"];
+    "Domicile du demandeur", "Autres dossiers à cette adresse", "Étiquette DPE", "Prix de vente (€)", "Prix au m² (€)", "Écart / moyenne commune (%)", "Dirigeant", "Siège de la société", "Parcelles", "Terrain (m²)", "Latitude", "Longitude", "Nouveau", "Statut", "Note", "Suivi mis à jour"];
   const cellule = (v) => {
     const s = String(v ?? "");
     return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const corps = lignes.map((f) => {
-    const s = E.suivi[f.id] || {};
+    const s = suiviDe(f) || {};
     const note = noteHO(f), d = distanceToul(f);
     return [NIVEAUX[note.niveau].nom, note.points, d == null ? "" : Math.round(d), note.services.map((k) => SERVICES[k]).join(", "),
       f.num, TYPES[f.t] || f.t, libelle(f), dateFr(f.da), CHANTIER_NOM[chantier(f)], dateFr(f.dd), dateFr(f.df),
       f.lg || "", f.sh || "", f.sl || "", (f.opt || []).map((o) => OPTIONS[o]).join(", "),
       joli(f.adr), joli(f.ld), f.cp, joli(f.ville), f.dep, f.dem || "Particulier", f.siret,
-      [f.dcp, joli(f.dville)].filter(Boolean).join(" "), f.etq || "", f.prix || "", f.pm2 || "", f.ratio ? Math.round((f.ratio - 1) * 100) : "", f.ent?.dir || "", f.ent?.adr || "", (f.cad || []).join(", "), f.st || "",
+      [f.dcp, joli(f.dville)].filter(Boolean).join(" "), membres(f).filter((m) => m !== f).map((m) => `${NOM_SOURCE(m)} ${dateFr(m.da)}`).join(", "), f.etq || "", f.prix || "", f.pm2 || "", f.ratio ? Math.round((f.ratio - 1) * 100) : "", f.ent?.dir || "", f.ent?.adr || "", (f.cad || []).join(", "), f.st || "",
       f.lat ?? "", f.lon ?? "", estNouveau(f) ? "oui" : "", STATUTS[s.s]?.nom || "", s.n || "", s.m ? dateFr(s.m) : ""]
       .map(cellule).join(";");
   });
@@ -653,7 +750,7 @@ $("#bouton-courriers").addEventListener("click", () => ouvrirCourriers(E.resulta
 $("#imprimer").addEventListener("click", () => window.print());
 $("#retour-courriers").addEventListener("click", fermerCourriers);
 $("#marquer-courriers").addEventListener("click", async (e) => {
-  const ids = courriersEnCours.map((f) => f.id);
+  const ids = courriersEnCours.map(cleSuivi);
   e.target.textContent = "Enregistrement…";
   try {
     const r = await api("/api/suivi", { ids, s: "courrier" });
@@ -665,10 +762,21 @@ $("#marquer-courriers").addEventListener("click", async (e) => {
 });
 
 // ----- Démarrage -------------------------------------------------------------
+// Service worker : appli + données gardées sur le téléphone (hors-ligne)
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+  navigator.serviceWorker.addEventListener("message", (e) => {
+    if (e.data?.type === "donnees-maj") $("#maj-dispo").hidden = false;
+  });
+}
+
 async function demarrer() {
   $("#logo-entete").innerHTML = LOGO_SVG;
   try {
-    const [rep, suivi] = await Promise.all([fetch("/data/permis.json"), api("/api/suivi")]);
+    const [rep, suivi] = await Promise.all([
+      fetch("/data/permis.json"),
+      api("/api/suivi").catch(() => ({ suivi: {}, vue: "" })), // hors-ligne sans copie du suivi
+    ]);
     if (rep.status === 401) { location.reload(); return; }
     if (!rep.ok) {
       $("#infos-donnees").textContent = "Pas encore de données";
@@ -677,15 +785,20 @@ async function demarrer() {
     }
     E.donnees = await rep.json();
     E.permis = E.donnees.permis || [];
+    E.groupes = new Map();
+    for (const f of E.permis) if (f.grp) (E.groupes.get(f.grp) || E.groupes.set(f.grp, []).get(f.grp)).push(f);
     E.suivi = suivi.suivi || {};
     E.vue = suivi.vue || "";
+    appliquerAttente();
+    afficherReseau();
+    envoyerAttente();
     // Première ouverture : rien n'est « nouveau », on mémorise la date des données
     if (!E.vue && E.donnees.maj) {
       E.vue = E.donnees.maj;
       api("/api/vue", { maj: E.donnees.maj }).catch(() => {});
     }
     $("#infos-donnees").textContent =
-      `${E.permis.length.toLocaleString("fr-FR")} prospects · permis jusqu'au ${dateFr(E.donnees.derniere_autorisation)}` +
+      `${(E.permis.filter((f) => !f.grp).length + E.groupes.size).toLocaleString("fr-FR")} prospects · permis jusqu'au ${dateFr(E.donnees.derniere_autorisation)}` +
       (E.donnees.derniere_vente ? ` · ventes jusqu'au ${dateFr(E.donnees.derniere_vente)}` : "") +
       (E.donnees.dernier_dpe ? ` · DPE jusqu'au ${dateFr(E.donnees.dernier_dpe)}` : "") + ` · mis à jour le ${dateFr(E.donnees.maj)}`;
     $("#recherche").value = E.filtres.q;

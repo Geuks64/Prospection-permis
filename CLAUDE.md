@@ -117,3 +117,16 @@ avec carte, suivi des prospects, nouveautés, courriers à imprimer et export Ex
   vente à ~25 m, même INSEE). Catégorie HO `dpe` (G +30, F +20, avant 1948, isolation, < 30 j…),
   courrier « Au propriétaire / À l'occupant » (mention base DPE ADEME). Bouton ⚡ DPE dans le
   sélecteur de source. Robot désormais **hebdomadaire** (lundi 05:17 UTC).
+- **Fiche unique par adresse (2026-11-07)** — `groupes.py` (appelé par `robot.py` en fin de collecte) :
+  union-find sur adresse normalisée (INSEE + numéro + voie, abréviations), liens parcelle
+  (`achat`/`pc`) et proximité (`lies`) ; groupes de 2 à 6 dossiers (au-delà = immeuble / zone
+  d'activité, pas regroupé) → champ `grp` (« G » + clé d'adresse). Appli : une carte par groupe
+  (meilleure note), étiquettes « + Vente / + DPE G », boutons dans la fiche pour passer d'un dossier
+  à l'autre, bonus +12 par source DIFFÉRENTE, **suivi partagé** (clé = `grp`, repli sur les ids).
+- **Appli iPhone hors-ligne (2026-11-07)** — `public/manifest.webmanifest` + `public/icones/`
+  (icône HO 180/192/512, publiques sans mot de passe) + `public/sw.js` (service worker : appli et
+  `data/permis.json` en copie locale mise à jour en arrière-plan avec bandeau « Recharger »,
+  `/api/suivi` réseau puis copie, tuiles OSM gardées ≤ 2 000 ; `__VERSION__` remplacé au
+  déploiement). Envois hors-ligne mis en file (`localStorage` « attente ») et renvoyés au retour du
+  réseau. La page de connexion est renvoyée en **401** (jamais mise en cache). Sur iPhone : Safari
+  → Partager → « Sur l'écran d'accueil » (il faut se reconnecter une fois dans l'appli installée).

@@ -113,7 +113,7 @@ async function routeSuivi(req: Request, env: Env): Promise<Response> {
   // Mise à jour groupée du statut (ex. « Courrier envoyé » après une impression) : notes conservées
   if (Array.isArray(c.ids)) {
     const s = String(c.s || "");
-    const ids = c.ids.map((x) => String(x).slice(0, 40)).filter(Boolean).slice(0, 500);
+    const ids = c.ids.map((x) => String(x).slice(0, 80)).filter(Boolean).slice(0, 500);
     if (!s || !STATUTS.includes(s)) return json({ erreur: "Statut invalide" }, 400);
     const suivi = await lireSuivi(env);
     const maintenant = new Date().toISOString();
@@ -129,7 +129,7 @@ async function routeSuivi(req: Request, env: Env): Promise<Response> {
     return json({ ok: true, entrees });
   }
 
-  const id = String(c.id || "").slice(0, 40);
+  const id = String(c.id || "").slice(0, 80);
   const s = String(c.s || "");
   const n = String(c.n || "").slice(0, 4000);
   if (!id || !STATUTS.includes(s)) return json({ erreur: "Données invalides" }, 400);
@@ -165,12 +165,17 @@ export default {
       });
     }
 
+    // Icônes et manifeste (installation sur l'écran d'accueil) : publics, sans données
+    if (chemin.startsWith("/icones/") || chemin === "/manifest.webmanifest") return env.ASSETS.fetch(req);
+
     // Tout le reste exige d'être connecté
     if (!(await estConnecte(req, env))) {
       if (chemin.startsWith("/api/") || chemin.startsWith("/data/")) {
         return json({ erreur: "Non connecté" }, 401);
       }
+      // (code 401 : le mode hors-ligne de l'appli ne garde jamais cette page en copie)
       return new Response(PAGE_CONNEXION, {
+        status: 401,
         headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
       });
     }

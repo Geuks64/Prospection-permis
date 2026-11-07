@@ -64,6 +64,10 @@ jobs:
       - name: Compilation du serveur
         run: npx esbuild src/index.ts --bundle --format=esm --outfile=public/_worker.js
 
+      # Nouvelle version du mode hors-ligne à chaque déploiement (le téléphone se met à jour)
+      - name: Version du mode hors-ligne
+        run: sed -i "s/__VERSION__/$(date +%Y%m%d%H%M)-${GITHUB_SHA::7}/" public/sw.js
+
       - name: Projet Pages (création si besoin)
         run: |
           if npx wrangler pages project list 2>/dev/null | grep -qw "$PROJET"; then
