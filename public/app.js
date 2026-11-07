@@ -16,6 +16,14 @@ const STATUTS = {
   signe: { nom: "Signé ✓", couleur: "#16a34a" },
   refus: { nom: "Pas intéressé", couleur: "#6b7280" },
 };
+const VISITES = { passe: "✅ Passé", absent: "🚪 Absent", flyer: "📄 Flyer déposé" };
+// Date du jour (heure française) au format AAAA-MM-JJ
+const aujourdhui = () => new Date().toLocaleDateString("sv-SE");
+function dansJours(n) {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toLocaleDateString("sv-SE");
+}
 const OPTIONS = { piscine: "Piscine", garage: "Garage", veranda: "Véranda", abri: "Abri de jardin", extension: "Extension", surelevation: "Surélévation", niveau: "Niveau en plus", photovoltaique: "Photovoltaïque" };
 const DESTINATIONS = { 1: "Habitation", 2: "Hôtel", 3: "Bureaux", 4: "Commerce", 6: "Industrie", 7: "Bâtiment agricole", 8: "Entrepôt", 9: "Équipement public" };
 const UTILISATION = { 1: "Pour y habiter / l'utiliser", 2: "Pour vendre", 3: "Pour louer", 4: "Vente et location" };
@@ -103,10 +111,13 @@ function reponseLocale(chemin, corps) {
   const m = new Date().toISOString();
   if (chemin === "/api/suivi" && corps.ids) {
     const entrees = {};
-    for (const id of corps.ids) entrees[id] = { s: corps.s, n: E.suivi[id]?.n || "", m };
+    for (const id of corps.ids) entrees[id] = { ...E.suivi[id], s: corps.s, n: E.suivi[id]?.n || "", m };
     return { ok: true, entrees, horsLigne: true };
   }
-  if (chemin === "/api/suivi") return { ok: true, entree: corps.s || corps.n ? { s: corps.s, n: corps.n, m } : null, horsLigne: true };
+  if (chemin === "/api/suivi") {
+    const vide = !corps.s && !corps.n && !corps.v && !corps.r;
+    return { ok: true, entree: vide ? null : { s: corps.s, n: corps.n, v: corps.v, vd: corps.vd, r: corps.r, m }, horsLigne: true };
+  }
   return { ok: true, horsLigne: true };
 }
 // Au démarrage hors-ligne : on réapplique les modifications en attente sur le suivi gardé en copie
@@ -168,6 +179,19 @@ function suiviDe(f) {
   for (const m of membres(f)) if (E.suivi[m.id]) return E.suivi[m.id];
   return null;
 }
+// Relance prévue aujourd'hui ou en retard
+const relanceDue = (f) => !!(suiviDe(f)?.r && suiviDe(f).r <= aujourdhui());
+
+/** Enregistre des changements sur le suivi d'un prospect (statut, note, visite, relance). */
+async function majSuivi(f, changements) {
+  const cle = cleSuivi(f); // suivi partagé par tous les dossiers de la même adresse
+  const actuel = suiviDe(f) || {};
+  const nouveau = { s: actuel.s || "", n: actuel.n || "", v: actuel.v || "", vd: actuel.vd || "", r: actuel.r || "", ...changements };
+  const rep = await api("/api/suivi", { id: cle, ...nouveau });
+  if (rep.entree) E.suivi[cle] = rep.entree; else delete E.suivi[cle];
+  for (const m of membres(f)) if (m.id !== cle) delete E.suivi[m.id];
+  return rep;
+}
 const NOM_SOURCE = (m) => ({ V: "Vente", E: `DPE ${m.etq || ""}`.trim() }[m.src] || m.t);
 
 function projet(f) {
@@ -225,8 +249,9 @@ function filtrer(pourSuivi, sourceForcee) {
   const q = F.q.trim().toLowerCase();
   const depuis = moisAvant(Number(F.periode) || 12);
   const res = E.permis.filter((f) => {
-    const s = suiviDe(f)?.s || "";
-    if (pourSuivi) return !!(s || suiviDe(f)?.n);
+    const su = suiviDe(f);
+    const s = su?.s || "";
+    if (pourSuivi) return !!(s || su?.n || su?.v || su?.r);
     if (source === "permis" && f.src === "V") return false;
     if (source === "ventes" && f.src !== "V") return false;
     if (source === "dpe" && f.src !== "E") return false;
@@ -261,7 +286,8 @@ function filtrer(pourSuivi, sourceForcee) {
     surface: (a, b) => ((b.sh || 0) + (b.sl || 0)) - ((a.sh || 0) + (a.sl || 0)),
     chaleur: (a, b) => noteHO(b).points - noteHO(a).points || (b.da || "").localeCompare(a.da || ""),
     proche: (a, b) => (distanceToul(a) ?? 999) - (distanceToul(b) ?? 999),
-    suivi: (a, b) => (suiviDe(b)?.m || "").localeCompare(suiviDe(a)?.m || ""),
+    // onglet Suivi : relances du jour (ou en retard) en premier, puis les plus récemment modifiés
+    suivi: (a, b) => (relanceDue(b) - relanceDue(a)) || (suiviDe(b)?.m || "").localeCompare(suiviDe(a)?.m || ""),
   }[tri];
   // Une seule carte par maison : on garde le dossier le plus intéressant de chaque groupe
   const meilleur = new Map();
@@ -345,7 +371,9 @@ function carteDossier(f) {
     <div class="ville">${echapper(f.cp)} ${echapper(joli(f.ville))}${distanceTexte(f) ? " · " + distanceTexte(f) : ""}${f.dem ? `<br><b>${echapper(f.dem)}</b>` : ""}</div>
     <div class="l3">${badgeInteret(f)}${f.src === "E" ? `<span class="etq etq-${f.etq}">DPE ${f.etq}</span>` : `<span class="etat ${ch}">${CHANTIER_NOM[ch]}</span>`}<span>${{ V: "vendu le", E: "diagnostic du" }[f.src] || "autorisé le"} ${dateFr(f.da)}</span>
       ${s ? `<span class="statut" style="background:${STATUTS[s].couleur}">${STATUTS[s].nom}</span>` : ""}
-      ${suiviDe(f)?.n ? "<span>📝</span>" : ""}</div>
+      ${suiviDe(f)?.n ? "<span>📝</span>" : ""}
+      ${suiviDe(f)?.v ? `<span class="visite">${VISITES[suiviDe(f).v]} ${dateFr(suiviDe(f).vd).slice(0, 5)}</span>` : ""}
+      ${suiviDe(f)?.r ? `<span class="relance-badge${relanceDue(f) ? " due" : ""}">📅 ${relanceDue(f) ? "à relancer" : "relance"} ${dateFr(suiviDe(f).r).slice(0, 5)}</span>` : ""}</div>
   </article>`;
 }
 
@@ -390,6 +418,11 @@ function dessinerCarte() {
     E.carte.on("popupopen", (e) => {
       const b = e.popup.getElement().querySelector("[data-ouvrir]");
       if (b) b.addEventListener("click", () => ouvrirFiche(b.dataset.ouvrir));
+      const t = e.popup.getElement().querySelector("[data-tournee]");
+      if (t) t.addEventListener("click", () => {
+        const f = E.permis.find((x) => x.id === t.dataset.tournee);
+        t.textContent = basculerTournee(f) ? "✓ Dans la tournée" : "➕ Tournée";
+      });
     });
   }
   setTimeout(() => E.carte.invalidateSize(), 50);
@@ -400,7 +433,8 @@ function dessinerCarte() {
     const m = L.circleMarker([f.lat, f.lon], { radius: 8, color: "#fff", weight: 2, fillColor: couleurPoint(f), fillOpacity: 0.95 });
     m.bindPopup(`<b>${echapper(libelle(f))}</b><br>${echapper(adresseComplete(f))}<br>
       <small>${NIVEAUX[noteHO(f).niveau].icone} ${NIVEAUX[noteHO(f).niveau].nom} · ${f.src === "V" ? `vendu le ${dateFr(f.da)}` : f.src === "E" ? `DPE ${f.etq} du ${dateFr(f.da)}` : `${f.t} autorisé le ${dateFr(f.da)} · ${CHANTIER_NOM[chantier(f)]}`}</small><br>
-      <button data-ouvrir="${echapper(f.id)}">Ouvrir la fiche</button>`);
+      <button data-ouvrir="${echapper(f.id)}">Ouvrir la fiche</button>
+      <button data-tournee="${echapper(f.id)}">${lireTournee().includes(f.id) ? "✓ Dans la tournée" : "➕ Tournée"}</button>`);
     points.push(m);
   }
   E.calque.addLayers(points);
@@ -421,18 +455,25 @@ $("#me-localiser").addEventListener("click", () => {
 function rafraichir() {
   E.resultats = filtrer(E.onglet === "suivi");
   const total = E.resultats.length;
+  const nbRelances = Object.values(E.suivi).filter((x) => x.r && x.r <= aujourdhui()).length;
+  $("#nb-relances").hidden = !nbRelances;
+  $("#nb-relances").textContent = nbRelances;
   const surCarte = E.resultats.filter((f) => f.lat != null).length;
   $("#compteur").textContent = E.onglet === "suivi"
-    ? `${total} prospect${total > 1 ? "s" : ""} suivi${total > 1 ? "s" : ""}`
+    ? `${total} prospect${total > 1 ? "s" : ""} suivi${total > 1 ? "s" : ""}` + (nbRelances ? ` · 📅 ${nbRelances} à relancer aujourd'hui` : "")
+    : E.onglet === "terrain" ? ""
     : `${total} dossier${total > 1 ? "s" : ""}` + (E.onglet === "carte" && surCarte < total ? ` (${surCarte} placés sur la carte)` : "");
   const cacherBarre = E.onglet === "suivi";
   $(".barre").hidden = cacherBarre;
   $("#sources").hidden = cacherBarre;
   compterSources();
   if (cacherBarre) $("#filtres").hidden = true;
-  $("#vue-liste").hidden = E.onglet === "carte";
+  $("#vue-liste").hidden = E.onglet === "carte" || E.onglet === "terrain";
   $("#vue-carte").hidden = E.onglet !== "carte";
-  if (E.onglet === "carte") dessinerCarte(); else dessinerListe();
+  $("#vue-terrain").hidden = E.onglet !== "terrain";
+  if (E.onglet === "carte") dessinerCarte();
+  else if (E.onglet === "terrain") dessinerTerrain();
+  else dessinerListe();
   dessinerBandeau();
 }
 
@@ -440,6 +481,7 @@ document.querySelectorAll(".onglets button").forEach((b) => b.addEventListener("
   document.querySelectorAll(".onglets button").forEach((x) => x.classList.toggle("actif", x === b));
   E.onglet = b.dataset.onglet;
   JOURNAL.compter(`onglet:${E.onglet}`);
+  if (E.onglet === "terrain" && !E.position) localiser(); // 1re ouverture : on demande la position GPS
   E.limite = 60;
   rafraichir();
   window.scrollTo(0, 0);
@@ -592,6 +634,16 @@ function ouvrirFiche(id) {
       <textarea id="note" placeholder="Notes : appel, rendez-vous, devis…">${echapper(suivi.n || "")}</textarea>
       <button class="enregistrer" id="enregistrer">Enregistrer</button>
       <div class="message-ok" id="message-suivi"></div>
+      <div class="sous-titre" style="margin-top:10px">Sur le terrain :</div>
+      <div class="statuts" id="choix-visite">
+        ${Object.entries(VISITES).map(([k, v]) => `<button class="puce${suivi.v === k ? " actif" : ""}" data-v="${k}">${v}</button>`).join("")}
+      </div>
+      ${suivi.v ? `<div class="remarque">Dernière visite : ${VISITES[suivi.v]} le ${dateFr(suivi.vd)}</div>` : ""}
+      <div class="relance">
+        <label>📅 Relancer le <input type="date" id="relance" value="${echapper(suivi.r || "")}"></label>
+        <div><button class="secondaire" data-plus="7">+1 sem.</button><button class="secondaire" data-plus="30">+1 mois</button><button class="secondaire" data-plus="-1">Aucune</button></div>
+      </div>
+      <button class="secondaire" id="tournee-un">${lireTournee().includes(f.id) ? "✓ Dans ma tournée (retirer)" : "➕ Ajouter à ma tournée"}</button>
     </div>
 
     <div class="bloc">
@@ -670,6 +722,28 @@ function ouvrirFiche(id) {
     enregistrer(id, statut);
   });
   $("#enregistrer").addEventListener("click", () => enregistrer(id, statut));
+  // Visite terrain (2e appui = retirer)
+  $("#choix-visite").addEventListener("click", async (e) => {
+    const b = e.target.closest(".puce");
+    if (!b) return;
+    const v = (suiviDe(f) || {}).v === b.dataset.v ? "" : b.dataset.v;
+    JOURNAL.compter(`visite:${v || "retirée"}`);
+    document.querySelectorAll("#choix-visite .puce").forEach((x) => x.classList.toggle("actif", x.dataset.v === v));
+    await majSuivi(f, { v, vd: v ? aujourdhui() : "" }).catch((x) => { $("#message-suivi").textContent = "⚠️ " + x.message; });
+    $("#message-suivi").textContent = "Visite enregistrée ✓";
+  });
+  // Date de relance
+  const relance = async (r) => {
+    $("#relance").value = r;
+    JOURNAL.compter("relance");
+    await majSuivi(f, { r }).catch((x) => { $("#message-suivi").textContent = "⚠️ " + x.message; });
+    $("#message-suivi").textContent = r ? `Relance prévue le ${dateFr(r)} ✓` : "Relance retirée ✓";
+  };
+  $("#relance").addEventListener("change", (e) => relance(e.target.value));
+  document.querySelectorAll("#fiche [data-plus]").forEach((b) => b.addEventListener("click", () => relance(b.dataset.plus === "-1" ? "" : dansJours(Number(b.dataset.plus)))));
+  $("#tournee-un").addEventListener("click", (e) => {
+    e.target.textContent = basculerTournee(f) ? "✓ Dans ma tournée (retirer)" : "➕ Ajouter à ma tournée";
+  });
   $("#courrier-un").addEventListener("click", () => { fermerFiche(); ouvrirCourriers([f]); });
   $("#copier-accroche").addEventListener("click", async (e) => {
     JOURNAL.compter("accroche-copiee");
@@ -681,14 +755,11 @@ function ouvrirFiche(id) {
 
 async function enregistrer(id, statut) {
   const f = E.permis.find((x) => x.id === id);
-  const cle = f ? cleSuivi(f) : id; // suivi partagé par tous les dossiers de la même adresse
   const note = $("#note").value.trim();
   const msg = $("#message-suivi");
   msg.textContent = "Enregistrement…";
   try {
-    const r = await api("/api/suivi", { id: cle, s: statut, n: note });
-    if (r.entree) E.suivi[cle] = r.entree; else delete E.suivi[cle];
-    if (f) for (const m of membres(f)) if (m.id !== cle) delete E.suivi[m.id];
+    const r = await majSuivi(f, { s: statut, n: note });
     msg.textContent = r.horsLigne ? "📴 Enregistré sur le téléphone (envoi au retour du réseau)" : "Enregistré ✓";
   } catch (e) {
     msg.textContent = "⚠️ Pas enregistré : " + e.message;
@@ -738,6 +809,146 @@ function exporter() {
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
 }
 $("#bouton-export").addEventListener("click", exporter);
+
+// ----- Mode terrain : autour de moi, visites, tournée ------------------------
+E.rayonTerrain = 5;
+
+function localiser() {
+  if (!navigator.geolocation) { alert("La localisation n'est pas disponible sur cet appareil."); return; }
+  $("#vue-terrain").querySelector("#localiser")?.replaceChildren("📍 Recherche…");
+  navigator.geolocation.getCurrentPosition((p) => {
+    E.position = { lat: p.coords.latitude, lon: p.coords.longitude, t: new Date() };
+    JOURNAL.compter("gps");
+    if (E.onglet === "terrain") rafraichir();
+  }, (err) => {
+    JOURNAL.noter("gps", `Position refusée ou introuvable (${err.code})`, err.message);
+    if (E.onglet === "terrain") rafraichir();
+    alert("Position introuvable. Sur iPhone : Réglages → Confidentialité → Service de localisation → Safari (ou l'appli) → « Lorsque l'app est active ».");
+  }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+}
+
+// La tournée est gardée sur le téléphone (liste d'identifiants)
+function lireTournee() {
+  try { return JSON.parse(localStorage.getItem("tournee")) || []; } catch (e) { return []; }
+}
+function basculerTournee(f) {
+  const ids = lireTournee();
+  const i = ids.indexOf(f.id);
+  if (i >= 0) ids.splice(i, 1); else ids.push(f.id);
+  sauver("tournee", ids);
+  JOURNAL.compter(i >= 0 ? "tournee-retrait" : "tournee-ajout");
+  return i < 0; // true = ajouté
+}
+const tourneeDossiers = () => lireTournee().map((id) => E.permis.find((x) => x.id === id)).filter((f) => f && f.lat != null);
+
+/** Ordre de passage le plus court (au plus proche, puis amélioration « 2-opt »). */
+function ordonner(arrets, depart) {
+  const d = (a, b) => distanceKm(a.lat, a.lon, b.lat, b.lon);
+  const reste = [...arrets];
+  const ordre = [];
+  let ici = depart;
+  while (reste.length) {
+    let k = 0;
+    reste.forEach((f, i) => { if (d(ici, f) < d(ici, reste[k])) k = i; });
+    ici = reste.splice(k, 1)[0];
+    ordre.push(ici);
+  }
+  const chemin = [depart, ...ordre];
+  for (let amelioration = true, tours = 0; amelioration && tours < 50; tours++) {
+    amelioration = false;
+    for (let i = 1; i < chemin.length - 2; i++) {
+      for (let j = i + 1; j < chemin.length - 1; j++) {
+        const avant = d(chemin[i - 1], chemin[i]) + d(chemin[j], chemin[j + 1]);
+        const apres = d(chemin[i - 1], chemin[j]) + d(chemin[i], chemin[j + 1]);
+        if (apres < avant - 0.01) { chemin.splice(i, j - i + 1, ...chemin.slice(i, j + 1).reverse()); amelioration = true; }
+      }
+    }
+  }
+  return chemin.slice(1);
+}
+
+function blocTournee(pos) {
+  const tour = tourneeDossiers();
+  if (!tour.length) {
+    return `<div class="bloc"><h3>🗺️ Ma tournée</h3><div class="remarque">Ajoute des prospects avec « ➕ Tournée » : l'appli calcule le meilleur ordre de passage et ouvre l'itinéraire dans Google Maps.</div></div>`;
+  }
+  const ordre = ordonner(tour, pos);
+  let km = 0;
+  [pos, ...ordre].reduce((a, b) => { km += distanceKm(a.lat, a.lon, b.lat, b.lon); return b; });
+  // Google Maps accepte 10 arrêts par itinéraire : au-delà, on découpe en plusieurs parties
+  const parties = [];
+  for (let i = 0; i < ordre.length; i += 10) parties.push(ordre.slice(i, i + 10));
+  const lien = (partie, origine) => {
+    const p = (f) => `${f.lat},${f.lon}`;
+    const etapes = partie.slice(0, -1).map(p).join("|");
+    return `https://www.google.com/maps/dir/?api=1&origin=${p(origine)}&destination=${p(partie[partie.length - 1])}` +
+      (etapes ? `&waypoints=${encodeURIComponent(etapes)}` : "") + "&travelmode=driving";
+  };
+  return `<div class="bloc tournee">
+    <h3>🗺️ Ma tournée · ${ordre.length} arrêt${ordre.length > 1 ? "s" : ""} · ≈ ${km * 1.3 < 10 ? (km * 1.3).toFixed(1).replace(".", ",") : Math.round(km * 1.3)} km</h3>
+    <ol>${ordre.map((f) => `<li><a href="#" data-ouvre="${echapper(f.id)}">${echapper(joli(f.adr) || joli(f.ld) || "?")}, ${echapper(joli(f.ville))}</a>
+      <span class="sous-titre">${echapper(libelle(f))}</span> <button class="retirer" data-retirer="${echapper(f.id)}" aria-label="Retirer">✕</button></li>`).join("")}</ol>
+    <div class="actions">
+      ${parties.map((partie, i) => `<a href="${lien(partie, i ? parties[i - 1][parties[i - 1].length - 1] : pos)}" target="_blank" rel="noopener" data-itineraire="1">🚗 Itinéraire${parties.length > 1 ? ` ${i * 10 + 1}–${i * 10 + partie.length}` : ""}</a>`).join("")}
+      <button class="secondaire" id="tournee-vider">Vider la tournée</button>
+    </div>
+    <div class="remarque">Ordre calculé depuis ${pos.defaut ? "Toul" : "ta position"}.</div>
+  </div>`;
+}
+
+function dessinerTerrain() {
+  const pos = E.position || { lat: HO.base.lat, lon: HO.base.lon, defaut: true };
+  const rayon = E.rayonTerrain;
+  const tousProches = E.resultats.filter((f) => f.lat != null)
+    .map((f) => ({ f, d: distanceKm(pos.lat, pos.lon, f.lat, f.lon) }))
+    .filter((x) => x.d <= rayon).sort((a, b) => a.d - b.d);
+  const proches = tousProches.slice(0, 80); // les 80 plus proches (liste lisible sur téléphone)
+  const tour = lireTournee();
+  const nbRelances = Object.values(E.suivi).filter((x) => x.r && x.r <= aujourdhui()).length;
+  $("#vue-terrain").innerHTML = `
+    <div class="bloc terrain-tete">
+      <div class="ligne-pos"><button id="localiser">📍 Me localiser</button>
+        <span class="sous-titre">${pos.defaut ? "Position : Toul (par défaut)" : `Position GPS de ${pos.t.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`}</span></div>
+      <div class="puces">${[2, 5, 10, 20].map((r) => `<button class="puce${r === rayon ? " actif" : ""}" data-rayon="${r}">${r} km</button>`).join("")}</div>
+    </div>
+    ${blocTournee(pos)}
+    ${nbRelances ? `<button class="bandeau-relances" id="voir-relances">📅 ${nbRelances} relance${nbRelances > 1 ? "s" : ""} à faire aujourd'hui → voir</button>` : ""}
+    <h3 class="titre-section">Autour de ${pos.defaut ? "Toul" : "moi"} : ${tousProches.length} prospect${tousProches.length > 1 ? "s" : ""} à moins de ${rayon} km${tousProches.length > 80 ? " (les 80 plus proches affichés — filtre 🔥 conseillé)" : ""}</h3>
+    ${proches.map(({ f, d }) => {
+      const v = suiviDe(f)?.v;
+      return `<div class="terrain-item">${carteDossier(f)}
+        <div class="actions-rapides" data-id="${echapper(f.id)}">
+          <span class="dist">📍 ${d < 1 ? `${Math.round(d * 1000)} m` : `${d.toFixed(1).replace(".", ",")} km`}</span>
+          <a href="https://maps.apple.com/?daddr=${f.lat},${f.lon}" target="_blank" rel="noopener">🚗</a>
+          ${Object.entries({ passe: "✅ Passé", absent: "🚪 Absent", flyer: "📄 Flyer" }).map(([k, nom]) => `<button data-act="${k}" class="${v === k ? "actif" : ""}">${nom}</button>`).join("")}
+          <button data-act="tournee" class="${tour.includes(f.id) ? "actif" : ""}">${tour.includes(f.id) ? "✓ Tournée" : "➕ Tournée"}</button>
+        </div></div>`;
+    }).join("") || '<div class="vide">Aucun prospect dans ce rayon avec ces filtres.<br>Agrandis le rayon ou change les filtres.</div>'}`;
+}
+
+$("#vue-terrain").addEventListener("click", async (e) => {
+  const cible = e.target.closest("button, a, .dossier");
+  if (!cible) return;
+  if (cible.id === "localiser") return localiser();
+  if (cible.dataset.rayon) { E.rayonTerrain = Number(cible.dataset.rayon); return rafraichir(); }
+  if (cible.id === "tournee-vider") { if (confirm("Vider la tournée ?")) { sauver("tournee", []); rafraichir(); } return; }
+  if (cible.id === "voir-relances") return document.querySelector('[data-onglet="suivi"]').click();
+  if (cible.dataset.itineraire) { JOURNAL.compter("tournee-itineraire"); return; }
+  if (cible.dataset.retirer) { e.preventDefault(); basculerTournee(E.permis.find((x) => x.id === cible.dataset.retirer)); return rafraichir(); }
+  if (cible.dataset.ouvre) { e.preventDefault(); return ouvrirFiche(cible.dataset.ouvre); }
+  const act = cible.dataset.act;
+  if (act) {
+    const f = E.permis.find((x) => x.id === cible.closest(".actions-rapides").dataset.id);
+    if (act === "tournee") basculerTournee(f);
+    else {
+      const v = suiviDe(f)?.v === act ? "" : act; // 2e appui = retirer
+      JOURNAL.compter(`visite:${v || "retirée"}`);
+      await majSuivi(f, { v, vd: v ? aujourdhui() : "" }).catch((x) => alert("Pas enregistré : " + x.message));
+    }
+    return rafraichir();
+  }
+  if (cible.classList.contains("dossier")) ouvrirFiche(cible.dataset.id);
+});
 
 // ----- Courriers à imprimer --------------------------------------------------
 const MAX_COURRIERS = 150;

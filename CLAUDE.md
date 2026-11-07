@@ -150,3 +150,10 @@ avec carte, suivi des prospects, nouveautés, courriers à imprimer et export Ex
 - Leaflet + markercluster désormais **hébergés dans `public/lib/leaflet/`** (plus de cdnjs) : carte
   testée en local (OK). Géocodage : résultats hors du département refusés, positions hors Lorraine
   du cache refaites ; accents « abîmés » des fichiers Sitadel réparés (`reparer_accents`).
+- **Mode terrain + tournée (2026-11-07)** — onglet « 📍 Terrain » : GPS (`navigator.geolocation`,
+  défaut = Toul), rayon 2/5/10/20 km, 80 plus proches (filtres et source appliqués), boutons
+  rapides ✅ Passé / 🚪 Absent / 📄 Flyer / ➕ Tournée / 🚗 (Plans). Tournée gardée sur le téléphone
+  (`localStorage` « tournee »), ordre optimisé (plus proche voisin + 2-opt), liens Google Maps par
+  tranches de 10 arrêts. Suivi enrichi côté Worker : `v` (passe|absent|flyer), `vd`, `r` (date de
+  relance) ; fiche : visite + « Relancer le » (+1 sem., +1 mois) + ajout tournée ; onglet Suivi :
+  relances du jour en premier + pastille rouge du nombre de relances ; `majSuivi(f, changements)`.

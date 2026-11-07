@@ -289,3 +289,31 @@ body.mode-courriers #courriers { display: block; }
 
 /* ----- Mode hors-ligne ----- */
 .reseau { margin: 0 16px 8px; padding: 8px 12px; border-radius: 10px; background: #e0e7ff; color: #3730a3; font-size: 13px; font-weight: 600; }
+
+/* ----- Mode terrain, tournée, relances ----- */
+.onglets button { font-size: 13px; padding: 8px 2px; }
+.terrain-tete { margin-top: 0; }
+.ligne-pos { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+.ligne-pos button { border: 0; border-radius: 10px; padding: 9px 12px; background: var(--bleu); color: var(--sur-bleu); font-weight: 700; }
+.titre-section { font-size: 14px; color: var(--gris); margin: 14px 2px 8px; }
+.terrain-item { margin-bottom: 10px; }
+.terrain-item .dossier { margin-bottom: 0; border-radius: 14px 14px 0 0; }
+.actions-rapides { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; background: var(--carte); border: 1px solid var(--bord);
+  border-top: 0; border-radius: 0 0 14px 14px; padding: 6px 8px; }
+.actions-rapides .dist { font-weight: 700; font-size: 13px; margin-right: auto; }
+.actions-rapides a, .actions-rapides button { border: 1px solid var(--bord); background: var(--fond); border-radius: 8px; padding: 6px 8px;
+  font-size: 13px; text-decoration: none; color: var(--texte); }
+.actions-rapides button.actif { background: var(--bleu); color: var(--sur-bleu); border-color: var(--bleu); }
+.tournee ol { margin: 6px 0 4px; padding-left: 22px; }
+.tournee li { margin: 6px 0; }
+.tournee li a { font-weight: 600; text-decoration: none; }
+.tournee .retirer { border: 0; background: transparent; color: var(--gris); font-size: 14px; }
+.bandeau-relances { width: 100%; margin-top: 10px; border: 0; border-radius: 12px; padding: 10px; background: #fee2e2; color: #991b1b; font-weight: 700; }
+.relance { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0 8px; }
+.relance input { font-size: 16px; padding: 6px; border-radius: 8px; border: 1px solid var(--bord); background: var(--fond); color: var(--texte); }
+.relance button { border-radius: 8px; padding: 6px 8px; font-size: 13px; margin-right: 4px; }
+#tournee-un { border-radius: 10px; padding: 9px 12px; width: 100%; font-weight: 600; }
+.visite { background: #dcfce7; color: #166534; border-radius: 6px; padding: 1px 6px; font-weight: 600; }
+.relance-badge { background: var(--fond); border-radius: 6px; padding: 1px 6px; }
+.relance-badge.due { background: #fee2e2; color: #991b1b; font-weight: 700; }
+.onglets .pastille { background: #dc2626; color: #fff; }

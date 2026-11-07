@@ -11,7 +11,7 @@
 //   POST /api/connexion   {motdepasse}        → ouvre une session (cookie)
 //   GET  /api/deconnexion                     → ferme la session
 //   GET  /api/suivi                           → {suivi, vue}
-//   POST /api/suivi       {id, s, n}          → enregistre statut (s) et note (n) d'un dossier
+//   POST /api/suivi       {id, s, n, v, vd, r} → statut, note, visite terrain, relance d'un prospect
 //   POST /api/suivi       {ids: [...], s}     → même statut pour plusieurs dossiers (courriers)
 //   POST /api/vue         {maj}               → marque les nouveautés comme vues
 //   POST /api/journal     {evenements, compteurs, appareil} → journal interne (bugs, usage)
@@ -98,7 +98,11 @@ async function connexion(req: Request, env: Env): Promise<Response> {
 
 // ----- Suivi des prospects (stockage KV) -------------------------------------
 
-type Suivi = Record<string, { s?: string; n?: string; m: string }>;
+// s = statut, n = note, v = visite sur le terrain (passe / absent / flyer), vd = date de la visite,
+// r = date de relance (AAAA-MM-JJ), m = date de la dernière modification
+type Suivi = Record<string, { s?: string; n?: string; v?: string; vd?: string; r?: string; m: string }>;
+const VISITES = ["", "passe", "absent", "flyer"];
+const estDate = (d: string) => d === "" || /^\d{4}-\d{2}-\d{2}$/.test(d);
 
 async function lireSuivi(env: Env): Promise<Suivi> {
   return ((await env.SUIVI.get("suivi", "json")) as Suivi | null) || {};
@@ -111,7 +115,9 @@ async function routeSuivi(req: Request, env: Env): Promise<Response> {
   }
   if (req.method !== "POST") return json({ erreur: "Méthode non permise" }, 405);
 
-  const c = (await req.json().catch(() => ({}))) as { id?: string; s?: string; n?: string; ids?: unknown };
+  const c = (await req.json().catch(() => ({}))) as {
+    id?: string; s?: string; n?: string; v?: string; vd?: string; r?: string; ids?: unknown;
+  };
 
   // Mise à jour groupée du statut (ex. « Courrier envoyé » après une impression) : notes conservées
   if (Array.isArray(c.ids)) {
@@ -125,7 +131,7 @@ async function routeSuivi(req: Request, env: Env): Promise<Response> {
       // On ne rétrograde pas un prospect déjà plus avancé (contacté, intéressé, signé…)
       const ancien = suivi[id];
       if (ancien?.s && ancien.s !== "a_contacter" && ancien.s !== s) continue;
-      suivi[id] = { s, n: ancien?.n || "", m: maintenant };
+      suivi[id] = { ...ancien, s, n: ancien?.n || "", m: maintenant };
       entrees[id] = suivi[id];
     }
     await env.SUIVI.put("suivi", JSON.stringify(suivi));
@@ -135,11 +141,16 @@ async function routeSuivi(req: Request, env: Env): Promise<Response> {
   const id = String(c.id || "").slice(0, 80);
   const s = String(c.s || "");
   const n = String(c.n || "").slice(0, 4000);
-  if (!id || !STATUTS.includes(s)) return json({ erreur: "Données invalides" }, 400);
+  const v = String(c.v || "");
+  const vd = String(c.vd || "").slice(0, 10);
+  const r = String(c.r || "").slice(0, 10);
+  if (!id || !STATUTS.includes(s) || !VISITES.includes(v) || !estDate(vd) || !estDate(r)) {
+    return json({ erreur: "Données invalides" }, 400);
+  }
 
   const suivi = await lireSuivi(env);
-  if (!s && !n) delete suivi[id]; // plus rien à retenir sur ce dossier
-  else suivi[id] = { s, n, m: new Date().toISOString() };
+  if (!s && !n && !v && !r) delete suivi[id]; // plus rien à retenir sur ce dossier
+  else suivi[id] = { s, n, v, vd, r, m: new Date().toISOString() };
   await env.SUIVI.put("suivi", JSON.stringify(suivi));
   return json({ ok: true, entree: suivi[id] || null });
 }

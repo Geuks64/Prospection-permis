@@ -52,7 +52,8 @@
 <nav class="onglets">
   <button data-onglet="liste" class="actif">📋 Liste</button>
   <button data-onglet="carte">🗺️ Carte</button>
-  <button data-onglet="suivi">⭐ Suivi</button>
+  <button data-onglet="terrain">📍 Terrain</button>
+  <button data-onglet="suivi">⭐ Suivi <span class="pastille" id="nb-relances" hidden></span></button>
 </nav>
 
 <!-- Recherche + filtres + export -->
@@ -103,6 +104,7 @@
 
 <main>
   <div id="vue-liste"></div>
+  <div id="vue-terrain" hidden></div>
   <div id="vue-carte" hidden>
     <div id="carte"></div>
     <button id="me-localiser" class="flottant" title="Me localiser">📍</button>
