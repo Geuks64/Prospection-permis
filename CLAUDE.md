@@ -52,5 +52,25 @@ avec carte, suivi des prospects, nouveautés, courriers à imprimer et export Ex
   - Géocodage OK sur `https://data.geopf.fr/geocodage/search` (et l'ancien api-adresse) — garder le
     score, adresses partielles → point sur la rue/commune.
   - Les DP sans création de surface (piscine seule, clôture, ravalement) ne sont PAS dans Sitadel.
-- En attente côté utilisateur : token Cloudflare (modèle « Edit Cloudflare Workers » +
-  « Workers KV Storage : Edit ») à enregistrer en secret du dépôt, + mot de passe de l'appli.
+- Secrets GitHub en place (2026-11-07) : `CLOUDFLARE_API_TOKEN` (token « prospection-permis »,
+  modèle Edit Cloudflare Workers, compte volkan.fener.54), `CLOUDFLARE_ACCOUNT_ID`, `APP_PASSWORD`.
+- **Étapes 1 + 2 écrites (2026-11-07)**, premier déploiement + premier passage du robot en cours :
+  - `robot.py` (stdlib) : 4 CSV DiDo → filtre 4 dép. + 365 j + hors annulés (état 4) → fiches
+    compactes (clés courtes : id, src L/N/D/A, t, num, e, da/dd/df, adr, ld, cp, ville, dem, siret,
+    dcp/dville, cad, st, nat, dest, tl, lg, sh, sl, ut, rp, niv, opt, lat/lon/geo a|r|c, vu) →
+    géocodage IGN (`citycode` = INSEE, cache `donnees/geocache.json`) → `public/data/permis.json`.
+    `donnees/vus.json` = date de 1re apparition (nouveautés).
+  - `.github/workflows/robot.yml` : cron le 2 et le 16 à 05:17 UTC + manuel ; commit des données
+    puis appel de `deploy.yml` (workflow_call).
+  - `.github/workflows/deploy.yml` : push main / manuel / appel ; crée le KV
+    `prospection-permis-suivi` (binding `SUIVI`) et envoie le secret `APP_PASSWORD`.
+  - Worker `src/index.ts` (+ `src/connexion.ts` = page mot de passe) : cookie de session HMAC
+    (180 j), `GET/POST /api/suivi` (KV clé `suivi` = {id: {s, n, m}}), `POST /api/vue` (KV clé
+    `vue` = date `maj` des données vues), fichiers `public/` servis via `ASSETS` (run_worker_first).
+  - Appli `public/index.html` + `app.js` + `style.css` : liste, filtres (dép., particuliers par
+    défaut, type, projet, chantier, options, période, statut, tri), fiche (suivi, itinéraire
+    Plans/Google, Street View, Géoportail cadastre, annuaire entreprises), carte Leaflet +
+    markercluster (cdnjs), bandeau nouveautés, export CSV `;` + BOM.
+  - URL attendue : https://prospection-permis.volkan-fener-54.workers.dev
+- Reste à faire : **étape 3 = courriers à imprimer** (lettre « Au propriétaire », mention RGPD).
+- Note : le conteneur Claude ne joint pas non plus cdnjs (carte non testable en local).

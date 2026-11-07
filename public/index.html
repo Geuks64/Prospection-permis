@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Prospection">
+<meta name="theme-color" content="#1d4ed8">
+<title>Prospection permis</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- En-tête -->
+<header class="entete">
+  <div>
+    <h1>🏗️ Prospection permis</h1>
+    <div class="sous-titre" id="infos-donnees">Chargement…</div>
+  </div>
+  <a class="bouton-discret" href="/api/deconnexion">Quitter</a>
+</header>
+
+<!-- Bandeau des nouveautés -->
+<div class="bandeau" id="bandeau" hidden>
+  <span id="bandeau-texte"></span>
+  <div class="bandeau-actions">
+    <button id="voir-nouveaux">Voir</button>
+    <button id="marquer-vus" class="secondaire">Marquer comme vus</button>
+  </div>
+</div>
+
+<!-- Onglets -->
+<nav class="onglets">
+  <button data-onglet="liste" class="actif">📋 Liste</button>
+  <button data-onglet="carte">🗺️ Carte</button>
+  <button data-onglet="suivi">⭐ Suivi</button>
+</nav>
+
+<!-- Recherche + filtres + export -->
+<section class="barre">
+  <input id="recherche" type="search" placeholder="Commune, rue, société, n° de dossier…" autocomplete="off">
+  <button id="bouton-filtres">Filtres <span class="pastille" id="nb-filtres" hidden></span></button>
+  <button id="bouton-export" title="Exporter la liste en CSV (Excel)">⤓ Excel</button>
+</section>
+
+<section class="filtres" id="filtres" hidden>
+  <div class="groupe"><h3>Départements</h3><div class="puces" data-filtre="deps"></div></div>
+  <div class="groupe"><h3>Demandeur</h3><div class="puces" data-filtre="dem"></div></div>
+  <div class="groupe"><h3>Type de dossier</h3><div class="puces" data-filtre="types"></div></div>
+  <div class="groupe"><h3>Projet</h3><div class="puces" data-filtre="projet"></div></div>
+  <div class="groupe"><h3>Chantier</h3><div class="puces" data-filtre="chantier"></div></div>
+  <div class="groupe"><h3>Comprend</h3><div class="puces" data-filtre="options"></div></div>
+  <div class="groupe"><h3>Autorisé depuis</h3><div class="puces" data-filtre="periode"></div></div>
+  <div class="groupe"><h3>Mon suivi</h3><div class="puces" data-filtre="statut"></div></div>
+  <div class="groupe">
+    <h3>Trier par</h3>
+    <select id="tri">
+      <option value="recent">Autorisation la plus récente</option>
+      <option value="ancien">Autorisation la plus ancienne</option>
+      <option value="commune">Commune (A → Z)</option>
+      <option value="surface">Plus grande surface créée</option>
+    </select>
+  </div>
+  <div class="filtres-actions">
+    <button id="reinitialiser" class="secondaire">Réinitialiser</button>
+    <button id="fermer-filtres">Voir les résultats</button>
+  </div>
+</section>
+
+<div class="compteur" id="compteur"></div>
+
+<main>
+  <div id="vue-liste"></div>
+  <div id="vue-carte" hidden>
+    <div id="carte"></div>
+    <button id="me-localiser" class="flottant" title="Me localiser">📍</button>
+  </div>
+</main>
+
+<!-- Fiche détaillée d'un dossier -->
+<div class="voile" id="voile" hidden></div>
+<aside class="fiche" id="fiche" hidden aria-modal="true" role="dialog"></aside>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

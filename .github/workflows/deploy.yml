@@ -1,0 +1,69 @@
+# Déploie l'appli (Worker + fichiers de public/) sur Cloudflare.
+# - automatiquement à chaque push sur main ;
+# - à la main (bouton « Run workflow ») ;
+# - à la fin du robot de collecte (robot.yml), pour publier les nouvelles données.
+# Secrets GitHub requis : CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, APP_PASSWORD.
+name: Déploiement Cloudflare
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # ref: main → toujours la dernière version (y compris les données que le robot vient d'ajouter)
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installation
+        run: npm ci
+
+      - name: Vérification du code (TypeScript)
+        run: npx tsc --noEmit
+
+      # Stockage KV du suivi des prospects : créé au premier déploiement, puis réutilisé.
+      - name: Stockage KV du suivi (création si besoin)
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          API="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/storage/kv/namespaces"
+          NOM="prospection-permis-suivi"
+          ID=$(curl -sS -H "Authorization: Bearer $CF_TOKEN" "$API?per_page=100" \
+            | jq -r --arg n "$NOM" '.result[]? | select(.title==$n) | .id' | head -n1)
+          if [ -z "$ID" ]; then
+            ID=$(curl -sS -X POST -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" \
+              -d "{\"title\":\"$NOM\"}" "$API" | jq -r '.result.id // empty')
+            [ -n "$ID" ] && echo "Stockage KV créé."
+          fi
+          if [ -z "$ID" ]; then
+            echo "::error::Impossible de créer le stockage KV (droit 'Workers KV Storage : Edit' manquant sur le token Cloudflare ?)"
+            exit 1
+          fi
+          printf '\n[[kv_namespaces]]\nbinding = "SUIVI"\nid = "%s"\n' "$ID" >> wrangler.toml
+          echo "Stockage KV branché."
+
+      - name: Déploiement + envoi du mot de passe au Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          secrets: |
+            APP_PASSWORD
+        env:
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}

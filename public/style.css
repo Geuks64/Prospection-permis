@@ -1,0 +1,188 @@
+/* ==========================================================================
+   Style de l'appli de prospection (pensée d'abord pour l'iPhone)
+   ========================================================================== */
+:root {
+  --fond: #f4f6fb;
+  --carte: #ffffff;
+  --texte: #111827;
+  --gris: #6b7280;
+  --bord: #e5e7eb;
+  --bleu: #1d4ed8;
+  --bleu-clair: #dbeafe;
+  --vert: #15803d;
+  --vert-clair: #dcfce7;
+  --orange: #c2410c;
+  --orange-clair: #ffedd5;
+  --rouge: #b91c1c;
+  --rouge-clair: #fee2e2;
+  --violet: #7c3aed;
+  --violet-clair: #ede9fe;
+  --jaune-clair: #fef9c3;
+  --ombre: 0 1px 3px rgba(0, 0, 0, .08);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --fond: #0f172a;
+    --carte: #1e293b;
+    --texte: #f1f5f9;
+    --gris: #94a3b8;
+    --bord: #334155;
+    --bleu: #60a5fa;
+    --bleu-clair: #1e3a5f;
+    --vert: #4ade80;
+    --vert-clair: #14532d;
+    --orange: #fb923c;
+    --orange-clair: #4a2511;
+    --rouge: #f87171;
+    --rouge-clair: #4c1d1d;
+    --violet: #a78bfa;
+    --violet-clair: #3b2a6b;
+    --jaune-clair: #423a10;
+    --ombre: none;
+  }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--fond);
+  color: var(--texte);
+  font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+button, select, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+a { color: var(--bleu); }
+[hidden] { display: none !important; }
+
+/* En-tête */
+.entete {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: calc(10px + env(safe-area-inset-top)) 16px 8px;
+}
+.entete h1 { margin: 0; font-size: 20px; }
+.sous-titre { color: var(--gris); font-size: 12px; }
+.bouton-discret { text-decoration: none; font-size: 14px; color: var(--gris); padding: 6px; }
+
+/* Bandeau nouveautés */
+.bandeau {
+  margin: 0 16px 8px; padding: 10px 12px; border-radius: 12px;
+  background: var(--jaune-clair); display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  justify-content: space-between; font-weight: 600;
+}
+.bandeau-actions { display: flex; gap: 6px; }
+
+/* Boutons génériques */
+.barre button, .bandeau button, .filtres-actions button, .actions a, .actions button, .enregistrer {
+  border: 0; border-radius: 10px; padding: 9px 12px; background: var(--bleu); color: #fff; font-weight: 600;
+  white-space: nowrap; text-decoration: none; display: inline-block; text-align: center;
+}
+button.secondaire, a.secondaire {
+  background: var(--carte); color: var(--texte); border: 1px solid var(--bord);
+}
+
+/* Onglets */
+.onglets {
+  position: sticky; top: 0; z-index: 500; display: flex; gap: 4px; padding: 6px 16px;
+  background: var(--fond);
+}
+.onglets button {
+  flex: 1; border: 1px solid var(--bord); background: var(--carte); border-radius: 10px; padding: 8px 4px;
+  font-weight: 600; font-size: 14px;
+}
+.onglets button.actif { background: var(--bleu); color: #fff; border-color: var(--bleu); }
+
+/* Barre recherche */
+.barre { display: flex; gap: 6px; padding: 4px 16px 8px; }
+.barre input {
+  flex: 1; min-width: 0; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--bord);
+  background: var(--carte); font-size: 16px; /* 16px : évite le zoom auto de l'iPhone */
+}
+.barre button { background: var(--carte); color: var(--texte); border: 1px solid var(--bord); }
+.pastille {
+  display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--bleu);
+  color: #fff; font-size: 12px; line-height: 18px;
+}
+
+/* Panneau des filtres */
+.filtres {
+  margin: 0 16px 8px; padding: 12px; background: var(--carte); border-radius: 14px;
+  border: 1px solid var(--bord); box-shadow: var(--ombre);
+}
+.groupe { margin-bottom: 12px; }
+.groupe h3 { margin: 0 0 6px; font-size: 13px; color: var(--gris); text-transform: uppercase; letter-spacing: .03em; }
+.puces { display: flex; flex-wrap: wrap; gap: 6px; }
+.puce {
+  border: 1px solid var(--bord); background: var(--fond); border-radius: 999px; padding: 6px 11px; font-size: 14px;
+}
+.puce.actif { background: var(--bleu); border-color: var(--bleu); color: #fff; }
+#tri { width: 100%; padding: 8px; border-radius: 10px; border: 1px solid var(--bord); background: var(--fond); font-size: 16px; }
+.filtres-actions { display: flex; gap: 8px; }
+.filtres-actions button { flex: 1; }
+
+.compteur { padding: 0 16px 6px; color: var(--gris); font-size: 13px; }
+
+/* Liste */
+main { padding: 0 16px 24px; }
+.dossier {
+  background: var(--carte); border-radius: 14px; padding: 12px; margin-bottom: 8px; border: 1px solid var(--bord);
+  box-shadow: var(--ombre); cursor: pointer;
+}
+.dossier .l1 { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.dossier .projet { font-weight: 650; }
+.dossier .adresse { margin-top: 4px; }
+.dossier .ville { color: var(--gris); font-size: 14px; }
+.dossier .l3 { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 13px; color: var(--gris); }
+.badge { font-size: 12px; font-weight: 700; padding: 2px 7px; border-radius: 6px; background: var(--bleu-clair); color: var(--bleu); }
+.badge.PD { background: var(--rouge-clair); color: var(--rouge); }
+.badge.PA { background: var(--violet-clair); color: var(--violet); }
+.badge.DP { background: var(--orange-clair); color: var(--orange); }
+.nouveau { font-size: 11px; font-weight: 800; padding: 2px 6px; border-radius: 6px; background: #facc15; color: #422006; }
+.etat { font-weight: 600; padding: 1px 7px; border-radius: 6px; }
+.etat.avant { background: var(--vert-clair); color: var(--vert); }
+.etat.encours { background: var(--orange-clair); color: var(--orange); }
+.etat.fini { background: var(--fond); color: var(--gris); }
+.statut { font-weight: 700; padding: 1px 7px; border-radius: 6px; color: #fff; }
+.plus { width: 100%; margin-top: 4px; padding: 12px; border-radius: 12px; border: 1px dashed var(--bord); background: transparent; font-weight: 600; }
+.vide { text-align: center; color: var(--gris); padding: 40px 10px; }
+
+/* Carte */
+#vue-carte { position: relative; }
+#carte { height: calc(100vh - 210px); min-height: 360px; border-radius: 14px; border: 1px solid var(--bord); }
+.flottant {
+  position: absolute; right: 10px; bottom: 24px; z-index: 600; width: 44px; height: 44px; border-radius: 50%;
+  border: 1px solid var(--bord); background: var(--carte); font-size: 20px; box-shadow: 0 2px 6px rgba(0,0,0,.2);
+}
+.leaflet-popup-content { font-size: 14px; }
+.leaflet-popup-content button { margin-top: 6px; border: 0; border-radius: 8px; padding: 6px 10px; background: #1d4ed8; color: #fff; font-weight: 600; }
+
+/* Fiche détaillée */
+.voile { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); z-index: 1000; }
+.fiche {
+  position: fixed; z-index: 1001; left: 0; right: 0; bottom: 0; max-height: 92vh; overflow-y: auto;
+  background: var(--fond); border-radius: 18px 18px 0 0; padding: 14px 16px calc(24px + env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling: touch;
+}
+@media (min-width: 720px) {
+  .fiche { left: auto; top: 0; width: 460px; max-height: none; border-radius: 0; }
+}
+.fiche-tete { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.fiche-tete h2 { margin: 0; font-size: 19px; }
+.fermer { border: 0; background: var(--carte); border-radius: 50%; width: 34px; height: 34px; font-size: 18px; flex: none; }
+.bloc { background: var(--carte); border-radius: 14px; padding: 12px; margin-top: 10px; border: 1px solid var(--bord); }
+.bloc h3 { margin: 0 0 8px; font-size: 13px; color: var(--gris); text-transform: uppercase; letter-spacing: .03em; }
+.ligne { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
+.ligne span:first-child { color: var(--gris); }
+.ligne span:last-child { text-align: right; }
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
+.actions a, .actions button { font-size: 14px; }
+.remarque { font-size: 13px; color: var(--gris); margin-top: 6px; }
+.statuts { display: flex; flex-wrap: wrap; gap: 6px; }
+.statuts .puce.actif { color: #fff; }
+textarea {
+  width: 100%; min-height: 90px; margin-top: 10px; padding: 10px; border-radius: 10px; border: 1px solid var(--bord);
+  background: var(--fond); font-size: 16px; resize: vertical;
+}
+.enregistrer { margin-top: 8px; width: 100%; }
+.message-ok { color: var(--vert); font-size: 13px; min-height: 18px; margin-top: 4px; text-align: center; }
