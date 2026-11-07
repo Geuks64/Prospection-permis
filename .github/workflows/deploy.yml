@@ -1,4 +1,4 @@
-# Déploie l'appli (Worker + fichiers de public/) sur Cloudflare.
+# Déploie l'appli sur Cloudflare Pages → https://hodemolition.pages.dev
 # - automatiquement à chaque push sur main ;
 # - à la main (bouton « Run workflow ») ;
 # - à la fin du robot de collecte (robot.yml), pour publier les nouvelles données.
@@ -15,10 +15,15 @@ concurrency:
   group: deploy
   cancel-in-progress: false
 
+env:
+  PROJET: hodemolition
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       # ref: main → toujours la dernière version (y compris les données que le robot vient d'ajouter)
       - uses: actions/checkout@v5
@@ -38,16 +43,13 @@ jobs:
 
       # Stockage KV du suivi des prospects : créé au premier déploiement, puis réutilisé.
       - name: Stockage KV du suivi (création si besoin)
-        env:
-          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          API="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/storage/kv/namespaces"
+          API="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces"
           NOM="prospection-permis-suivi"
-          ID=$(curl -sS -H "Authorization: Bearer $CF_TOKEN" "$API?per_page=100" \
+          ID=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$API?per_page=100" \
             | jq -r --arg n "$NOM" '.result[]? | select(.title==$n) | .id' | head -n1)
           if [ -z "$ID" ]; then
-            ID=$(curl -sS -X POST -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" \
+            ID=$(curl -sS -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" \
               -d "{\"title\":\"$NOM\"}" "$API" | jq -r '.result.id // empty')
             [ -n "$ID" ] && echo "Stockage KV créé."
           fi
@@ -58,12 +60,30 @@ jobs:
           printf '\n[[kv_namespaces]]\nbinding = "SUIVI"\nid = "%s"\n' "$ID" >> wrangler.toml
           echo "Stockage KV branché."
 
-      - name: Déploiement + envoi du mot de passe au Worker
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          secrets: |
-            APP_PASSWORD
+      # Le code du serveur (TypeScript) devient public/_worker.js (mode « avancé » de Pages)
+      - name: Compilation du serveur
+        run: npx esbuild src/index.ts --bundle --format=esm --outfile=public/_worker.js
+
+      - name: Projet Pages (création si besoin)
+        run: |
+          if npx wrangler pages project list 2>/dev/null | grep -qw "$PROJET"; then
+            echo "Projet $PROJET déjà créé."
+          else
+            npx wrangler pages project create "$PROJET" --production-branch main
+          fi
+
+      - name: Mot de passe de l'appli
         env:
           APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+        run: printf '%s' "$APP_PASSWORD" | npx wrangler pages secret put APP_PASSWORD --project-name "$PROJET"
+
+      - name: Déploiement
+        run: npx wrangler pages deploy --project-name "$PROJET" --branch main --commit-dirty=true
+
+      - name: Adresse de l'appli
+        run: |
+          SUB=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJET" \
+            | jq -r '.result.subdomain // empty')
+          echo "Appli en ligne : https://$SUB"
+          echo "### ✅ Appli en ligne : https://$SUB" >> "$GITHUB_STEP_SUMMARY"

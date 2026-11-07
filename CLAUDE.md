@@ -63,7 +63,8 @@ avec carte, suivi des prospects, nouveautés, courriers à imprimer et export Ex
   - `.github/workflows/robot.yml` : cron le 2 et le 16 à 05:17 UTC + manuel ; commit des données
     puis appel de `deploy.yml` (workflow_call).
   - `.github/workflows/deploy.yml` : push main / manuel / appel ; crée le KV
-    `prospection-permis-suivi` (binding `SUIVI`) et envoie le secret `APP_PASSWORD`.
+    `prospection-permis-suivi` (binding `SUIVI`), crée le projet Pages `hodemolition` si besoin,
+    envoie le secret `APP_PASSWORD` (`wrangler pages secret put`) puis `wrangler pages deploy`.
   - Worker `src/index.ts` (+ `src/connexion.ts` = page mot de passe) : cookie de session HMAC
     (180 j), `GET/POST /api/suivi` (KV clé `suivi` = {id: {s, n, m}}), `POST /api/vue` (KV clé
     `vue` = date `maj` des données vues), fichiers `public/` servis via `ASSETS` (run_worker_first).
@@ -71,7 +72,12 @@ avec carte, suivi des prospects, nouveautés, courriers à imprimer et export Ex
     défaut, type, projet, chantier, options, période, statut, tri), fiche (suivi, itinéraire
     Plans/Google, Street View, Géoportail cadastre, annuaire entreprises), carte Leaflet +
     markercluster (cdnjs), bandeau nouveautés, export CSV `;` + BOM.
-  - URL : https://hodemolition.volkan-fener-54.workers.dev (Worker renommé « hodemolition » le 2026-11-07 ; l'ancien Worker « prospection-permis » peut être supprimé)
+  - URL : **https://hodemolition.pages.dev** — hébergé en **Cloudflare Pages** (mode avancé :
+    `src/index.ts` compilé par esbuild en `public/_worker.js` au déploiement, non versionné) et non
+    plus en Worker, pour que l'adresse ne contienne pas « volkan-fener-54 » (le sous-domaine
+    workers.dev est commun à tout le compte : l'utilisateur ne veut PAS le changer, tiktok-resume
+    doit garder son adresse). Les anciens Workers « prospection-permis » et « hodemolition »
+    (*.volkan-fener-54.workers.dev) sont obsolètes et peuvent être supprimés.
 - **Personnalisation HO Démolition (2026-11-07)** — l'utilisateur final est le patron de
   HO Démolition (Toul 54200, 06 49 85 96 54, hodemolition@gmail.com), lui-même apporteur
   d'affaires : métier principal débarras / curage / nettoyage, + mise en relation avec des

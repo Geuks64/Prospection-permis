@@ -1,20 +1,14 @@
-# Configuration du Worker Cloudflare (le "serveur" de l'appli).
+# Configuration Cloudflare Pages (le "serveur" de l'appli) → https://hodemolition.pages.dev
+# Pages plutôt que Workers : l'adresse .pages.dev ne contient pas le nom du compte Cloudflare.
+#
+# Le code du serveur (src/index.ts) est compilé en public/_worker.js au moment du déploiement
+# (mode « avancé » de Pages) : chaque demande passe d'abord par le code, qui vérifie le mot de
+# passe avant de servir un fichier de public/.
 name = "hodemolition"
-main = "src/index.ts"
+pages_build_output_dir = "./public"
 compatibility_date = "2026-10-01"
 
-# Fichiers de l'appli (page, script, données). run_worker_first : chaque demande passe
-# d'abord par le code (vérification du mot de passe) avant de servir un fichier.
-[assets]
-directory = "./public"
-binding = "ASSETS"
-run_worker_first = true
-
-# Journaux visibles dans le tableau de bord Cloudflare (Workers > hodemolition > Logs)
-[observability]
-enabled = true
-
-# - Le stockage KV "SUIVI" (statuts et notes des prospects) est créé et branché
-#   automatiquement par le workflow de déploiement (.github/workflows/deploy.yml).
+# - Le stockage KV "SUIVI" (statuts et notes des prospects) est branché automatiquement par
+#   le workflow de déploiement (.github/workflows/deploy.yml).
 # - Le secret APP_PASSWORD n'est PAS ici : il est envoyé par le workflow de déploiement
 #   (secret GitHub APP_PASSWORD), jamais écrit dans le code.
