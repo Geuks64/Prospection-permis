@@ -1,0 +1,29 @@
+# Outil ponctuel : supprime les 2 anciens Workers devenus inutiles depuis le passage à
+# Cloudflare Pages (prospection-permis et hodemolition en *.volkan-fener-54.workers.dev).
+# Ne touche PAS au projet Pages « hodemolition » (l'appli) ni au stockage du suivi.
+name: Nettoyage anciens Workers
+
+on:
+  workflow_dispatch:
+
+jobs:
+  nettoyage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Suppression des anciens Workers
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          COMPTE: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          API="https://api.cloudflare.com/client/v4/accounts/$COMPTE"
+          echo "Workers présents avant :"
+          curl -sS -H "Authorization: Bearer $TOKEN" "$API/workers/scripts" | jq -r '.result[]?.id'
+          for NOM in prospection-permis hodemolition; do
+            CODE=$(curl -sS -o r.json -w "%{http_code}" -X DELETE -H "Authorization: Bearer $TOKEN" \
+              "$API/workers/scripts/$NOM?force=true")
+            echo "$NOM → HTTP $CODE $(jq -c '{success, errors}' r.json)"
+          done
+          echo "Workers restants :"
+          curl -sS -H "Authorization: Bearer $TOKEN" "$API/workers/scripts" | jq -r '.result[]?.id'
+          echo "Projet Pages (doit toujours exister) :"
+          curl -sS -H "Authorization: Bearer $TOKEN" "$API/pages/projects/hodemolition" | jq -c '{success, sous_domaine: .result.subdomain}'
