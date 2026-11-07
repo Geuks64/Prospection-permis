@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Prospection">
-<meta name="theme-color" content="#1d4ed8">
-<title>Prospection permis</title>
+<meta name="apple-mobile-web-app-title" content="HO Prospection">
+<meta name="theme-color" content="#18181b">
+<title>HO Démolition · Prospection</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css">
@@ -17,9 +17,12 @@
 
 <!-- En-tête -->
 <header class="entete">
-  <div>
-    <h1>🏗️ Prospection permis</h1>
-    <div class="sous-titre" id="infos-donnees">Chargement…</div>
+  <div class="marque">
+    <span id="logo-entete"></span>
+    <div>
+      <h1>HO <span>Démolition</span></h1>
+      <div class="sous-titre" id="infos-donnees">Chargement…</div>
+    </div>
   </div>
   <a class="bouton-discret" href="/api/deconnexion">Quitter</a>
 </header>
@@ -44,10 +47,13 @@
 <section class="barre">
   <input id="recherche" type="search" placeholder="Commune, rue, société, n° de dossier…" autocomplete="off">
   <button id="bouton-filtres">Filtres <span class="pastille" id="nb-filtres" hidden></span></button>
+  <button id="bouton-courriers" title="Préparer les courriers de la liste">✉️</button>
   <button id="bouton-export" title="Exporter la liste en CSV (Excel)">⤓ Excel</button>
 </section>
 
 <section class="filtres" id="filtres" hidden>
+  <div class="groupe"><h3>Intérêt pour HO</h3><div class="puces" data-filtre="interet"></div></div>
+  <div class="groupe"><h3>Autour de Toul</h3><div class="puces" data-filtre="rayon"></div></div>
   <div class="groupe"><h3>Départements</h3><div class="puces" data-filtre="deps"></div></div>
   <div class="groupe"><h3>Demandeur</h3><div class="puces" data-filtre="dem"></div></div>
   <div class="groupe"><h3>Type de dossier</h3><div class="puces" data-filtre="types"></div></div>
@@ -59,6 +65,8 @@
   <div class="groupe">
     <h3>Trier par</h3>
     <select id="tri">
+      <option value="chaleur">Les plus intéressants pour HO</option>
+      <option value="proche">Les plus proches de Toul</option>
       <option value="recent">Autorisation la plus récente</option>
       <option value="ancien">Autorisation la plus ancienne</option>
       <option value="commune">Commune (A → Z)</option>
@@ -81,12 +89,24 @@
   </div>
 </main>
 
+<!-- Courriers à imprimer (affichés à la place de l'appli) -->
+<section id="courriers">
+  <div class="barre-courriers">
+    <button id="retour-courriers" class="secondaire">← Retour</button>
+    <button id="imprimer">🖨️ Imprimer</button>
+    <button id="marquer-courriers" class="secondaire">✓ Marquer « Courrier envoyé »</button>
+    <div class="sous-titre" id="nb-courriers"></div>
+  </div>
+  <div id="lettres"></div>
+</section>
+
 <!-- Fiche détaillée d'un dossier -->
 <div class="voile" id="voile" hidden></div>
 <aside class="fiche" id="fiche" hidden aria-modal="true" role="dialog"></aside>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
+<script src="ho.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

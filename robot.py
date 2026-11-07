@@ -22,6 +22,7 @@ import json
 import os
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -33,6 +34,7 @@ JOURS = 365                               # profondeur : 12 derniers mois
 SORTIE = "public/data/permis.json"        # fichier lu par l'appli
 CACHE_GEO = "donnees/geocache.json"
 VUS = "donnees/vus.json"
+CACHE_ENT = "donnees/entreprises.json"
 UA = {"User-Agent": "prospection-permis/1.0 (robot GitHub Actions)"}
 
 DIDO = "https://data.statistiques.developpement-durable.gouv.fr/dido/api/v1/datafiles/{}/csv"
@@ -138,6 +140,12 @@ def convertir(source, l):
         "rp": entier(l.get("RES_PRINCIP_OU_SECOND")),
         "niv": entier(l.get("NB_NIV_MAX")),
         "opt": options,
+        # Pour la note « intérêt HO » : transformation, surfaces existantes et démolies
+        "tt": entier(l.get("TYPE_TRANSFO_PRINCIPAL")),
+        "sav": sum(entier(l.get(c)) for c in ("SURF_HAB_AVANT", "SURF_LOC_AVANT")),
+        "sdem": sum(entier(l.get(c)) for c in ("SURF_HAB_DEMOLIE", "SURF_LOC_DEMOLIE")),
+        "ldem": entier(l.get("NB_LGT_DEMOLIS")),
+        "cj": nettoyer(l.get("CJ_DEM")),
     }
     # On retire les champs vides pour alléger le fichier
     return {k: v for k, v in fiche.items() if v not in ("", 0, [], None) or k in ("e",)}
@@ -249,6 +257,79 @@ def geocoder_tout(fiches):
 
 
 # ---------------------------------------------------------------------------
+# Sociétés : adresse du siège + dirigeant (annuaire officiel, gratuit, sans clé)
+# ---------------------------------------------------------------------------
+ANNUAIRE = "https://recherche-entreprises.api.gouv.fr/search"
+
+
+def chercher_entreprise(siren):
+    """Renvoie {nom, adr, dir, ok} pour un SIREN, ou {} si introuvable."""
+    url = ANNUAIRE + "?" + urllib.parse.urlencode({"q": siren, "per_page": 1, "page": 1})
+    for essai in range(5):
+        try:
+            req = urllib.request.Request(url, headers=UA)
+            with urllib.request.urlopen(req, timeout=30) as r:
+                res = (json.load(r).get("results") or [])
+            break
+        except urllib.error.HTTPError as e:
+            if e.code == 429:            # limite : 7 requêtes / seconde
+                time.sleep(2 + 2 * essai)
+                continue
+            if e.code in (400, 404):
+                return {}
+            time.sleep(1 + essai)
+        except Exception:  # noqa: BLE001
+            time.sleep(1 + essai)
+    else:
+        raise RuntimeError("annuaire injoignable")
+    res = [x for x in res if x.get("siren") == siren]
+    if not res:
+        return {}
+    e = res[0]
+    siege = e.get("siege") or {}
+    dirigeant = ""
+    for d in e.get("dirigeants") or []:
+        if d.get("type_dirigeant") == "personne physique" and d.get("nom"):
+            prenom = (d.get("prenoms") or "").split(" ")[0].title()
+            dirigeant = f"{prenom} {d['nom'].upper()}".strip()
+            if d.get("qualite"):
+                dirigeant += f" ({d['qualite']})"
+            break
+    return {
+        "nom": e.get("nom_complet", ""),
+        "adr": siege.get("adresse", ""),
+        "dir": dirigeant,
+        "actif": e.get("etat_administratif", "A") == "A",
+    }
+
+
+def enrichir_societes(fiches):
+    cache = charger(CACHE_ENT, {})
+    sirens = sorted({f["siret"][:9] for f in fiches if len(f.get("siret", "")) >= 9})
+    a_faire = [s for s in sirens if s not in cache]
+    log(f"\n== Annuaire des entreprises : {len(a_faire)} sociétés à chercher ({len(cache)} déjà connues)")
+    erreurs = 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+        futurs = {}
+        for s in a_faire:
+            futurs[pool.submit(chercher_entreprise, s)] = s
+            time.sleep(0.15)                  # reste sous la limite de 7 requêtes / seconde
+        for fut in concurrent.futures.as_completed(futurs):
+            try:
+                cache[futurs[fut]] = fut.result()
+            except Exception:  # noqa: BLE001 - réessayé au prochain passage
+                erreurs += 1
+    if erreurs:
+        log(f"  {erreurs} sociétés en échec (réessayées la prochaine fois)")
+    cache = {k: v for k, v in cache.items() if k in set(sirens)}
+    ecrire(CACHE_ENT, cache)
+    for f in fiches:
+        info = cache.get(f.get("siret", "")[:9])
+        if info:
+            f["ent"] = {k: v for k, v in info.items() if v not in ("", None)}
+
+
+# ---------------------------------------------------------------------------
 # Fichiers JSON du dépôt
 # ---------------------------------------------------------------------------
 def charger(chemin, defaut):
@@ -294,6 +375,7 @@ def main():
     fiches = sorted(uniques.values(), key=lambda f: f.get("da", ""), reverse=True)
 
     geocoder_tout(fiches)
+    enrichir_societes(fiches)
 
     # Date de première apparition (pour les « nouveautés »)
     vus = charger(VUS, {})

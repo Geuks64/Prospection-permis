@@ -12,6 +12,7 @@
 //   GET  /api/deconnexion                     → ferme la session
 //   GET  /api/suivi                           → {suivi, vue}
 //   POST /api/suivi       {id, s, n}          → enregistre statut (s) et note (n) d'un dossier
+//   POST /api/suivi       {ids: [...], s}     → même statut pour plusieurs dossiers (courriers)
 //   POST /api/vue         {maj}               → marque les nouveautés comme vues
 //   tout le reste                             → fichiers de public/ (si connecté)
 // =============================================================================
@@ -107,7 +108,27 @@ async function routeSuivi(req: Request, env: Env): Promise<Response> {
   }
   if (req.method !== "POST") return json({ erreur: "Méthode non permise" }, 405);
 
-  const c = (await req.json().catch(() => ({}))) as { id?: string; s?: string; n?: string };
+  const c = (await req.json().catch(() => ({}))) as { id?: string; s?: string; n?: string; ids?: unknown };
+
+  // Mise à jour groupée du statut (ex. « Courrier envoyé » après une impression) : notes conservées
+  if (Array.isArray(c.ids)) {
+    const s = String(c.s || "");
+    const ids = c.ids.map((x) => String(x).slice(0, 40)).filter(Boolean).slice(0, 500);
+    if (!s || !STATUTS.includes(s)) return json({ erreur: "Statut invalide" }, 400);
+    const suivi = await lireSuivi(env);
+    const maintenant = new Date().toISOString();
+    const entrees: Suivi = {};
+    for (const id of ids) {
+      // On ne rétrograde pas un prospect déjà plus avancé (contacté, intéressé, signé…)
+      const ancien = suivi[id];
+      if (ancien?.s && ancien.s !== "a_contacter" && ancien.s !== s) continue;
+      suivi[id] = { s, n: ancien?.n || "", m: maintenant };
+      entrees[id] = suivi[id];
+    }
+    await env.SUIVI.put("suivi", JSON.stringify(suivi));
+    return json({ ok: true, entrees });
+  }
+
   const id = String(c.id || "").slice(0, 40);
   const s = String(c.s || "");
   const n = String(c.n || "").slice(0, 4000);

@@ -72,5 +72,20 @@ avec carte, suivi des prospects, nouveautés, courriers à imprimer et export Ex
     Plans/Google, Street View, Géoportail cadastre, annuaire entreprises), carte Leaflet +
     markercluster (cdnjs), bandeau nouveautés, export CSV `;` + BOM.
   - URL attendue : https://prospection-permis.volkan-fener-54.workers.dev
-- Reste à faire : **étape 3 = courriers à imprimer** (lettre « Au propriétaire », mention RGPD).
+- **Personnalisation HO Démolition (2026-11-07)** — l'utilisateur final est le patron de
+  HO Démolition (Toul 54200, 06 49 85 96 54, hodemolition@gmail.com), lui-même apporteur
+  d'affaires : métier principal débarras / curage / nettoyage, + mise en relation avec des
+  artisans (maçonnerie, ouvertures, dalles, terrassement, terrasses, murets, plomberie,
+  électricité, façade, toiture, gouttières alu, étanchéité). Choix validés : appli et courriers
+  aux couleurs HO (noir / or / orange), particuliers + sociétés par défaut, lettres A4.
+  - `public/ho.js` = tout ce qui est propre à HO : coordonnées, `noteHO()` (points → niveaux
+    très chaud / chaud / tiède / froid ; catégories demolition, transformation, extension,
+    maison_neuve, logements_neufs, local_travaux, local_neuf, amenagement), services à proposer,
+    `accroche()`, `htmlCourrier()` (adresse placée pour enveloppe à fenêtre, mention RGPD),
+    distance depuis Toul (48.6753, 5.8917), logo SVG.
+  - Robot : champs ajoutés `tt`, `sav`, `sdem`, `ldem`, `cj` + `ent` (annuaire
+    recherche-entreprises.api.gouv.fr : nom, adresse du siège, dirigeant, actif ; cache
+    `donnees/entreprises.json`).
+  - Courriers = étape 3 faite : bouton ✉️ (liste filtrée, max 150) ou depuis la fiche ;
+    texte modifiable avant impression ; « Marquer Courrier envoyé » (POST /api/suivi {ids, s}).
 - Note : le conteneur Claude ne joint pas non plus cdnjs (carte non testable en local).

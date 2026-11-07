@@ -29,13 +29,15 @@ const CHOIX = {
   chantier: [["avant", "Pas commencé"], ["encours", "En cours"], ["fini", "Terminé"]],
   options: Object.entries(OPTIONS).filter(([k]) => k !== "niveau"),
   periode: [["1", "1 mois"], ["3", "3 mois"], ["6", "6 mois"], ["12", "12 mois"]],
+  interet: [["3", "🔥🔥🔥 Très chaud"], ["2", "🔥🔥 Chaud"], ["1", "🔥 Tiède"], ["0", "❄️ Froid"]],
+  rayon: [["20", "20 km"], ["40", "40 km"], ["60", "60 km"], ["tout", "Toute la zone"]],
   statut: [["tous", "Tous"], ["aucun", "Sans statut"], ...Object.entries(STATUTS).map(([k, v]) => [k, v.nom])],
 };
 // Filtres à choix unique (les autres sont à choix multiples ; vide = tout)
-const UNIQUES = new Set(["dem", "periode", "statut"]);
+const UNIQUES = new Set(["dem", "periode", "statut", "rayon"]);
 
 function filtresParDefaut() {
-  return { q: "", deps: [], dem: "particulier", types: [], projet: [], chantier: [], options: [], periode: "12", statut: "tous", tri: "recent", nouveaux: false };
+  return { q: "", deps: [], dem: "tous", types: [], projet: [], chantier: [], options: [], interet: [], rayon: "tout", periode: "12", statut: "tous", tri: "chaleur", nouveaux: false };
 }
 
 // ----- État de l'appli -------------------------------------------------------
@@ -65,7 +67,7 @@ function sauver(cle, valeur) {
   try { localStorage.setItem(cle, JSON.stringify(valeur)); } catch (e) { /* navigation privée : tant pis */ }
 }
 function chargerFiltres() {
-  try { return { ...filtresParDefaut(), ...(JSON.parse(localStorage.getItem("filtres")) || {}), nouveaux: false }; } catch (e) { return filtresParDefaut(); }
+  try { return { ...filtresParDefaut(), ...(JSON.parse(localStorage.getItem("filtres_ho")) || {}), nouveaux: false }; } catch (e) { return filtresParDefaut(); }
 }
 async function api(chemin, corps) {
   const r = await fetch(chemin, corps ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) } : {});
@@ -141,6 +143,11 @@ function filtrer(pourSuivi) {
     if (F.chantier.length && !F.chantier.includes(chantier(f))) return false;
     if (F.options.length && !F.options.some((o) => (f.opt || []).includes(o))) return false;
     if ((f.da || "") < depuis) return false;
+    if (F.interet.length && !F.interet.includes(String(noteHO(f).niveau))) return false;
+    if (F.rayon !== "tout") {
+      const d = distanceToul(f);
+      if (d == null || d > Number(F.rayon)) return false;
+    }
     if (F.statut === "aucun" && s) return false;
     if (F.statut !== "tous" && F.statut !== "aucun" && s !== F.statut) return false;
     if (q) {
@@ -155,6 +162,8 @@ function filtrer(pourSuivi) {
     ancien: (a, b) => (a.da || "").localeCompare(b.da || ""),
     commune: (a, b) => (a.ville || "").localeCompare(b.ville || "", "fr") || (b.da || "").localeCompare(a.da || ""),
     surface: (a, b) => ((b.sh || 0) + (b.sl || 0)) - ((a.sh || 0) + (a.sl || 0)),
+    chaleur: (a, b) => noteHO(b).points - noteHO(a).points || (b.da || "").localeCompare(a.da || ""),
+    proche: (a, b) => (distanceToul(a) ?? 999) - (distanceToul(b) ?? 999),
     suivi: (a, b) => (E.suivi[b.id]?.m || "").localeCompare(E.suivi[a.id]?.m || ""),
   }[tri];
   return res.sort(cmp);
@@ -163,8 +172,8 @@ function filtrer(pourSuivi) {
 function nbFiltresActifs() {
   const F = E.filtres, D = filtresParDefaut();
   let n = 0;
-  for (const k of ["deps", "types", "projet", "chantier", "options"]) if (F[k].length) n++;
-  for (const k of ["dem", "periode", "statut"]) if (F[k] !== D[k]) n++;
+  for (const k of ["deps", "types", "projet", "chantier", "options", "interet"]) if (F[k].length) n++;
+  for (const k of ["dem", "periode", "statut", "rayon"]) if (F[k] !== D[k]) n++;
   if (F.nouveaux) n++;
   return n;
 }
@@ -199,21 +208,30 @@ document.querySelectorAll(".puces[data-filtre]").forEach((zone) => {
 });
 
 function changementFiltres() {
-  sauver("filtres", { ...E.filtres, nouveaux: false });
+  sauver("filtres_ho", { ...E.filtres, nouveaux: false });
   E.limite = 60;
   dessinerFiltres();
   rafraichir();
 }
 
 // ----- Affichage : liste -----------------------------------------------------
+function badgeInteret(f) {
+  const n = NIVEAUX[noteHO(f).niveau];
+  return `<span class="interet ${n.classe}">${n.icone} ${n.nom}</span>`;
+}
+function distanceTexte(f) {
+  const d = distanceToul(f);
+  return d == null ? "" : `à ${Math.round(d)} km de Toul`;
+}
+
 function carteDossier(f) {
   const ch = chantier(f);
   const s = E.suivi[f.id]?.s;
   return `<article class="dossier" data-id="${echapper(f.id)}">
     <div class="l1"><span class="badge ${f.t}">${f.t}</span><span class="projet">${echapper(libelle(f))}</span>${estNouveau(f) ? '<span class="nouveau">NOUVEAU</span>' : ""}</div>
     <div class="adresse">${echapper(joli(f.adr) || joli(f.ld) || "Adresse non précisée")}</div>
-    <div class="ville">${echapper(f.cp)} ${echapper(joli(f.ville))}${f.dem ? " · " + echapper(f.dem) : ""}</div>
-    <div class="l3"><span class="etat ${ch}">${CHANTIER_NOM[ch]}</span><span>autorisé le ${dateFr(f.da)}</span>
+    <div class="ville">${echapper(f.cp)} ${echapper(joli(f.ville))}${distanceTexte(f) ? " · " + distanceTexte(f) : ""}${f.dem ? `<br><b>${echapper(f.dem)}</b>` : ""}</div>
+    <div class="l3">${badgeInteret(f)}<span class="etat ${ch}">${CHANTIER_NOM[ch]}</span><span>autorisé le ${dateFr(f.da)}</span>
       ${s ? `<span class="statut" style="background:${STATUTS[s].couleur}">${STATUTS[s].nom}</span>` : ""}
       ${E.suivi[f.id]?.n ? "<span>📝</span>" : ""}</div>
   </article>`;
@@ -240,13 +258,18 @@ $("#vue-liste").addEventListener("click", (e) => {
 function couleurPoint(f) {
   const s = E.suivi[f.id]?.s;
   if (s) return STATUTS[s].couleur;
-  return { avant: "#16a34a", encours: "#ea580c", fini: "#9ca3af" }[chantier(f)];
+  return { 3: "#dc2626", 2: "#f97316", 1: "#eab308", 0: "#9ca3af" }[noteHO(f).niveau];
 }
 
 function dessinerCarte() {
   if (!window.L) { $("#carte").innerHTML = '<div class="vide">Carte indisponible (pas de connexion ?)</div>'; return; }
   if (!E.carte) {
     E.carte = L.map("carte", { zoomControl: true }).setView([48.75, 6.3], 8);
+    // Repère du siège de HO à Toul
+    L.marker([HO.base.lat, HO.base.lon], {
+      icon: L.divIcon({ className: "repere-ho", html: "HO", iconSize: [34, 34] }),
+      zIndexOffset: 1000,
+    }).addTo(E.carte).bindPopup(`<b>${HO.nom}</b><br>${HO.ville}`);
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19, attribution: "© OpenStreetMap",
     }).addTo(E.carte);
@@ -264,7 +287,7 @@ function dessinerCarte() {
     if (f.lat == null) continue;
     const m = L.circleMarker([f.lat, f.lon], { radius: 8, color: "#fff", weight: 2, fillColor: couleurPoint(f), fillOpacity: 0.95 });
     m.bindPopup(`<b>${echapper(libelle(f))}</b><br>${echapper(adresseComplete(f))}<br>
-      <small>${f.t} autorisé le ${dateFr(f.da)} · ${CHANTIER_NOM[chantier(f)]}</small><br>
+      <small>${NIVEAUX[noteHO(f).niveau].icone} ${NIVEAUX[noteHO(f).niveau].nom} · ${f.t} autorisé le ${dateFr(f.da)} · ${CHANTIER_NOM[chantier(f)]}</small><br>
       <button data-ouvrir="${echapper(f.id)}">Ouvrir la fiche</button>`);
     points.push(m);
   }
@@ -359,6 +382,20 @@ function ouvrirFiche(id) {
       <button class="fermer" id="fermer-fiche" aria-label="Fermer">✕</button>
     </div>
 
+    <div class="bloc bloc-ho">
+      <h3>🎯 Intérêt pour ${HO.nom}</h3>
+      <div class="note-ho">${badgeInteret(f)} <span class="sous-titre">${distanceTexte(f)}</span></div>
+      <ul class="raisons">${noteHO(f).raisons.map((r) => `<li>${echapper(r)}</li>`).join("")}</ul>
+      <div class="sous-titre">À proposer :</div>
+      <div class="services">${noteHO(f).services.map((k) => `<span>${SERVICES[k]}</span>`).join("")}</div>
+      <details class="accroche"><summary>📞 Phrase d'accroche</summary><p id="texte-accroche">${echapper(accroche(f))}</p>
+        <button class="secondaire" id="copier-accroche">Copier</button></details>
+      <div class="actions">
+        <button id="courrier-un">✉️ Préparer le courrier</button>
+        ${f.ent?.adr || !f.dem ? "" : '<span class="remarque">Adresse du siège inconnue : courrier envoyé à l\'adresse du chantier.</span>'}
+      </div>
+    </div>
+
     <div class="bloc">
       <h3>Mon suivi</h3>
       <div class="statuts" id="choix-statut">
@@ -407,7 +444,9 @@ function ouvrirFiche(id) {
     <div class="bloc">
       <h3>Demandeur</h3>
       ${f.dem
-        ? `${ligne("Société", echapper(f.dem))}${ligne("SIRET", f.siret ? `<a href="https://annuaire-entreprises.data.gouv.fr/etablissement/${echapper(f.siret)}" target="_blank" rel="noopener">${echapper(f.siret)}</a>` : "")}`
+        ? `${ligne("Société", echapper(f.dem))}${ligne("Dirigeant", echapper(f.ent?.dir || ""))}${ligne("Siège", echapper(joli(f.ent?.adr || "")))}${f.ent && f.ent.actif === false ? '<div class="remarque">⚠️ Société fermée selon l\'annuaire.</div>' : ""}${ligne("SIRET", f.siret ? `<a href="https://annuaire-entreprises.data.gouv.fr/etablissement/${echapper(f.siret)}" target="_blank" rel="noopener">${echapper(f.siret)}</a>` : "")}
+           <div class="actions"><a class="secondaire" href="https://www.google.com/search?q=${encodeURIComponent((f.ent?.nom || f.dem) + " " + (f.dville || "") + " téléphone")}" target="_blank" rel="noopener">🔎 Trouver le téléphone</a>
+           ${f.ent?.dir ? `<a class="secondaire" href="https://www.google.com/search?q=${encodeURIComponent(f.ent.dir.replace(/\s*\(.*\)$/, "") + " " + (f.ent?.nom || f.dem))}" target="_blank" rel="noopener">🔎 Le dirigeant</a>` : ""}</div>`
         : ligne("Demandeur", "Particulier (nom non publié)")}
       ${ligne("Domicile", echapper([f.dcp, joli(f.dville)].filter(Boolean).join(" ")))}
       ${!f.dem && autreVille ? '<div class="remarque">💡 Habite une autre commune que celle du chantier : sans doute un nouvel arrivant.</div>' : ""}
@@ -438,6 +477,10 @@ function ouvrirFiche(id) {
     enregistrer(id, statut);
   });
   $("#enregistrer").addEventListener("click", () => enregistrer(id, statut));
+  $("#courrier-un").addEventListener("click", () => { fermerFiche(); ouvrirCourriers([f]); });
+  $("#copier-accroche").addEventListener("click", async (e) => {
+    try { await navigator.clipboard.writeText($("#texte-accroche").textContent); e.target.textContent = "Copié ✓"; } catch (x) { e.target.textContent = "Copie impossible"; }
+  });
   $("#fermer-fiche").addEventListener("click", fermerFiche);
 }
 
@@ -466,20 +509,22 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#fic
 function exporter() {
   const lignes = E.resultats;
   if (!lignes.length) { alert("Aucun dossier à exporter."); return; }
-  const entetes = ["Numéro", "Type", "Projet", "Autorisé le", "État du chantier", "Chantier ouvert le", "Terminé le",
+  const entetes = ["Intérêt HO", "Points", "Distance de Toul (km)", "À proposer", "Numéro", "Type", "Projet", "Autorisé le", "État du chantier", "Chantier ouvert le", "Terminé le",
     "Logements créés", "Surface habitable créée (m²)", "Surface d'activité créée (m²)", "Comprend",
     "Adresse", "Lieu-dit", "Code postal", "Commune", "Département", "Demandeur", "SIRET",
-    "Domicile du demandeur", "Parcelles", "Terrain (m²)", "Latitude", "Longitude", "Nouveau", "Statut", "Note", "Suivi mis à jour"];
+    "Domicile du demandeur", "Dirigeant", "Siège de la société", "Parcelles", "Terrain (m²)", "Latitude", "Longitude", "Nouveau", "Statut", "Note", "Suivi mis à jour"];
   const cellule = (v) => {
     const s = String(v ?? "");
     return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const corps = lignes.map((f) => {
     const s = E.suivi[f.id] || {};
-    return [f.num, TYPES[f.t] || f.t, libelle(f), dateFr(f.da), CHANTIER_NOM[chantier(f)], dateFr(f.dd), dateFr(f.df),
+    const note = noteHO(f), d = distanceToul(f);
+    return [NIVEAUX[note.niveau].nom, note.points, d == null ? "" : Math.round(d), note.services.map((k) => SERVICES[k]).join(", "),
+      f.num, TYPES[f.t] || f.t, libelle(f), dateFr(f.da), CHANTIER_NOM[chantier(f)], dateFr(f.dd), dateFr(f.df),
       f.lg || "", f.sh || "", f.sl || "", (f.opt || []).map((o) => OPTIONS[o]).join(", "),
       joli(f.adr), joli(f.ld), f.cp, joli(f.ville), f.dep, f.dem || "Particulier", f.siret,
-      [f.dcp, joli(f.dville)].filter(Boolean).join(" "), (f.cad || []).join(", "), f.st || "",
+      [f.dcp, joli(f.dville)].filter(Boolean).join(" "), f.ent?.dir || "", f.ent?.adr || "", (f.cad || []).join(", "), f.st || "",
       f.lat ?? "", f.lon ?? "", estNouveau(f) ? "oui" : "", STATUTS[s.s]?.nom || "", s.n || "", s.m ? dateFr(s.m) : ""]
       .map(cellule).join(";");
   });
@@ -488,15 +533,51 @@ function exporter() {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `prospects_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `prospects_HO_${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(a);
   a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
 }
 $("#bouton-export").addEventListener("click", exporter);
 
+// ----- Courriers à imprimer --------------------------------------------------
+const MAX_COURRIERS = 150;
+let courriersEnCours = [];
+
+function ouvrirCourriers(liste) {
+  if (!liste.length) { alert("Aucun dossier dans la liste."); return; }
+  if (liste.length > MAX_COURRIERS &&
+      !confirm(`${liste.length} dossiers : seuls les ${MAX_COURRIERS} premiers (les plus intéressants selon le tri) seront préparés. Continuer ?`)) return;
+  courriersEnCours = liste.slice(0, MAX_COURRIERS);
+  $("#lettres").innerHTML = courriersEnCours.map(htmlCourrier).join("");
+  $("#nb-courriers").textContent = `${courriersEnCours.length} courrier${courriersEnCours.length > 1 ? "s" : ""} — tu peux modifier le texte en touchant dessus`;
+  $("#marquer-courriers").textContent = "✓ Marquer « Courrier envoyé »";
+  document.body.classList.add("mode-courriers");
+  window.scrollTo(0, 0);
+}
+function fermerCourriers() {
+  document.body.classList.remove("mode-courriers");
+  $("#lettres").innerHTML = "";
+  rafraichir();
+}
+$("#bouton-courriers").addEventListener("click", () => ouvrirCourriers(E.resultats));
+$("#imprimer").addEventListener("click", () => window.print());
+$("#retour-courriers").addEventListener("click", fermerCourriers);
+$("#marquer-courriers").addEventListener("click", async (e) => {
+  const ids = courriersEnCours.map((f) => f.id);
+  e.target.textContent = "Enregistrement…";
+  try {
+    const r = await api("/api/suivi", { ids, s: "courrier" });
+    Object.assign(E.suivi, r.entrees || {});
+    e.target.textContent = `✓ ${ids.length} marqués « Courrier envoyé »`;
+  } catch (x) {
+    e.target.textContent = "⚠️ Échec : " + x.message;
+  }
+});
+
 // ----- Démarrage -------------------------------------------------------------
 async function demarrer() {
+  $("#logo-entete").innerHTML = LOGO_SVG;
   try {
     const [rep, suivi] = await Promise.all([fetch("/data/permis.json"), api("/api/suivi")]);
     if (rep.status === 401) { location.reload(); return; }
