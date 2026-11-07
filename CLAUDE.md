@@ -84,7 +84,7 @@ avec carte, suivi des prospects, nouveautés, courriers à imprimer et export Ex
   artisans (maçonnerie, ouvertures, dalles, terrassement, terrasses, murets, plomberie,
   électricité, façade, toiture, gouttières alu, étanchéité). Choix validés : appli et courriers
   aux couleurs HO (noir / or / orange), particuliers + sociétés par défaut, lettres A4.
-  - `public/ho.js` = tout ce qui est propre à HO : coordonnées, `noteHO()` (points → niveaux
+  - `public/ho.js` = tout ce qui est propre à HO : coordonnées, `noteHO()` (points → niveaux, seuils 100 / 75 / 45 calés sur les vraies données ;
     très chaud / chaud / tiède / froid ; catégories demolition, transformation, extension,
     maison_neuve, logements_neufs, local_travaux, local_neuf, amenagement), services à proposer,
     `accroche()`, `htmlCourrier()` (adresse placée pour enveloppe à fenêtre, mention RGPD),

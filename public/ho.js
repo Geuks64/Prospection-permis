@@ -127,7 +127,8 @@ function noteHO(f) {
     else if (d > 80) { p -= 10; raisons.push(`Loin de Toul (${Math.round(d)} km)`); }
   }
 
-  const niveau = p >= 85 ? 3 : p >= 55 ? 2 : p >= 30 ? 1 : 0;
+  // Seuils calés sur les vraies données (nov. 2026) : ~10 % très chauds, ~25 % chauds
+  const niveau = p >= 100 ? 3 : p >= 75 ? 2 : p >= 45 ? 1 : 0;
   f._note = { points: p, niveau, raisons, services: SERVICES_PAR_CATEGORIE[cat], categorie: cat };
   return f._note;
 }
