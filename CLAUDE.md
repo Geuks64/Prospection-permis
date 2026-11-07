@@ -109,3 +109,11 @@ avec carte, suivi des prospects, nouveautés, courriers à imprimer et export Ex
   propriétaire » (mention DVF / DGFiP). Outil de test : `outils/test_dvf.py` + `test-dvf.yml`.
   - Sélecteur **Tout / 🏗️ Permis / 🏠 Ventes** en haut de la liste (filtre `source`, avec compteurs ;
     s'applique aussi à la carte, aux courriers et à l'export).
+- **DPE récents (2026-11-07)** — 3e source : `dpe.py` (appelé par `robot.py`), API data-fair ADEME
+  `data.ademe.fr/data-fair/api/v1/datasets/dpe03existant/lines` (qs + pagination `next`) : **maisons**,
+  étiquette **D à G**, DPE de **moins de 120 jours**, 54/55/57/88 (Moselle comprise ; données à
+  quelques jours près). Dédoublonnage (DPE remplacés, 1 par `identifiant_ban`). Fiches `src: "E"`,
+  `t: "DPE"`, `etq`, `ges`, `an`, `per`, `sb`, `niv`, `chauf`, `iso`, `cout`, `fin`, `lies` (permis /
+  vente à ~25 m, même INSEE). Catégorie HO `dpe` (G +30, F +20, avant 1948, isolation, < 30 j…),
+  courrier « Au propriétaire / À l'occupant » (mention base DPE ADEME). Bouton ⚡ DPE dans le
+  sélecteur de source. Robot désormais **hebdomadaire** (lundi 05:17 UTC).

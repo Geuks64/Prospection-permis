@@ -6,7 +6,7 @@
 "use strict";
 
 // ----- Libellés --------------------------------------------------------------
-const TYPES = { PC: "Permis de construire", DP: "Déclaration préalable", PD: "Permis de démolir", PA: "Permis d'aménager", VT: "Vente récente" };
+const TYPES = { PC: "Permis de construire", DP: "Déclaration préalable", PD: "Permis de démolir", PA: "Permis d'aménager", VT: "Vente récente", DPE: "Diagnostic énergie (DPE)" };
 const DEPS = { "54": "54", "55": "55", "57": "57", "88": "88" };
 const STATUTS = {
   a_contacter: { nom: "À contacter", couleur: "#2563eb" },
@@ -25,7 +25,7 @@ const CHOIX = {
   deps: Object.entries(DEPS),
   dem: [["tous", "Tous"], ["particulier", "Particuliers"], ["societe", "Sociétés"]],
   types: Object.entries(TYPES),
-  projet: [["maison", "Maison neuve"], ["logements", "Plusieurs logements"], ["existant", "Travaux sur l'existant"], ["local", "Local d'activité / agricole"], ["achat", "Maison achetée"], ["achat_local", "Local acheté"]],
+  projet: [["maison", "Maison neuve"], ["logements", "Plusieurs logements"], ["existant", "Travaux sur l'existant"], ["local", "Local d'activité / agricole"], ["achat", "Maison achetée"], ["achat_local", "Local acheté"], ["dpe", "Maison avec DPE récent"]],
   chantier: [["avant", "Pas commencé"], ["encours", "En cours"], ["fini", "Terminé"]],
   options: Object.entries(OPTIONS).filter(([k]) => k !== "niveau"),
   periode: [["1", "1 mois"], ["3", "3 mois"], ["6", "6 mois"], ["12", "12 mois"]],
@@ -79,11 +79,12 @@ async function api(chemin, corps) {
 // ----- Interprétation d'un dossier -------------------------------------------
 function chantier(f) {
   if (f.src === "V") return "vente";
+  if (f.src === "E") return "dpe";
   if (f.e === 6 || f.df) return "fini";
   if (f.e === 5 || f.dd) return "encours";
   return "avant";
 }
-const CHANTIER_NOM = { avant: "Pas commencé", encours: "Chantier en cours", fini: "Terminé", vente: "Vendu" };
+const CHANTIER_NOM = { avant: "Pas commencé", encours: "Chantier en cours", fini: "Terminé", vente: "Vendu", dpe: "Diagnostic" };
 const euros = (n) => (n || 0).toLocaleString("fr-FR") + " €";
 const estParticulier = (f) => !f.dem && !f.siret; // (acheteurs DVF : jamais publiés → comptés comme particuliers)
 const estNouveau = (f) => !!E.vue && f.vu > E.vue;
@@ -91,6 +92,7 @@ const estNouveau = (f) => !!E.vue && f.vu > E.vue;
 function projet(f) {
   // Catégorie utilisée par le filtre « Projet »
   if (f.src === "V") return f.bien === "maison" ? "achat" : "achat_local";
+  if (f.src === "E") return "dpe";
   if (f.t === "PD" || f.t === "PA") return "";
   if (f.src.includes("L") && f.nat === 1) return f.tl === 1 ? "maison" : "logements";
   if (f.src.includes("L")) return "existant";
@@ -104,6 +106,7 @@ function libelle(f) {
     if (f.bien === "maison") return `Maison achetée · ${f.sb} m²${f.pp ? ` · ${f.pp} p.` : ""}${f.ratio && f.ratio < 0.8 ? " · prix bas" : ""}`;
     return `Local commercial acheté${f.sb ? ` · ${f.sb} m²` : ""}`;
   }
+  if (f.src === "E") return `Maison · DPE ${f.etq}${f.sb ? ` · ${f.sb} m²` : ""}${f.per ? ` · ${f.per}` : ""}`;
   if (f.t === "PD") txt = f.dem ? "Démolition" : "Démolition (particulier)";
   else if (f.t === "PA") txt = "Aménagement / lotissement";
   else if (f.src.includes("L")) {
@@ -145,6 +148,8 @@ function filtrer(pourSuivi, sourceForcee) {
     if (pourSuivi) return !!(s || E.suivi[f.id]?.n);
     if (source === "permis" && f.src === "V") return false;
     if (source === "ventes" && f.src !== "V") return false;
+    if (source === "dpe" && f.src !== "E") return false;
+    if (source === "permis" && f.src === "E") return false;
     if (F.nouveaux && !estNouveau(f)) return false;
     if (F.deps.length && !F.deps.includes(f.dep)) return false;
     if (F.dem === "particulier" && !estParticulier(f)) return false;
@@ -243,7 +248,7 @@ function carteDossier(f) {
     <div class="l1"><span class="badge ${f.t}">${f.t}</span><span class="projet">${echapper(libelle(f))}</span>${estNouveau(f) ? '<span class="nouveau">NOUVEAU</span>' : ""}</div>
     <div class="adresse">${echapper(joli(f.adr) || joli(f.ld) || "Adresse non précisée")}</div>
     <div class="ville">${echapper(f.cp)} ${echapper(joli(f.ville))}${distanceTexte(f) ? " · " + distanceTexte(f) : ""}${f.dem ? `<br><b>${echapper(f.dem)}</b>` : ""}</div>
-    <div class="l3">${badgeInteret(f)}<span class="etat ${ch}">${CHANTIER_NOM[ch]}</span><span>${f.src === "V" ? "vendu le" : "autorisé le"} ${dateFr(f.da)}</span>
+    <div class="l3">${badgeInteret(f)}${f.src === "E" ? `<span class="etq etq-${f.etq}">DPE ${f.etq}</span>` : `<span class="etat ${ch}">${CHANTIER_NOM[ch]}</span>`}<span>${{ V: "vendu le", E: "diagnostic du" }[f.src] || "autorisé le"} ${dateFr(f.da)}</span>
       ${s ? `<span class="statut" style="background:${STATUTS[s].couleur}">${STATUTS[s].nom}</span>` : ""}
       ${E.suivi[f.id]?.n ? "<span>📝</span>" : ""}</div>
   </article>`;
@@ -299,7 +304,7 @@ function dessinerCarte() {
     if (f.lat == null) continue;
     const m = L.circleMarker([f.lat, f.lon], { radius: 8, color: "#fff", weight: 2, fillColor: couleurPoint(f), fillOpacity: 0.95 });
     m.bindPopup(`<b>${echapper(libelle(f))}</b><br>${echapper(adresseComplete(f))}<br>
-      <small>${NIVEAUX[noteHO(f).niveau].icone} ${NIVEAUX[noteHO(f).niveau].nom} · ${f.src === "V" ? `vendu le ${dateFr(f.da)}` : `${f.t} autorisé le ${dateFr(f.da)} · ${CHANTIER_NOM[chantier(f)]}`}</small><br>
+      <small>${NIVEAUX[noteHO(f).niveau].icone} ${NIVEAUX[noteHO(f).niveau].nom} · ${f.src === "V" ? `vendu le ${dateFr(f.da)}` : f.src === "E" ? `DPE ${f.etq} du ${dateFr(f.da)}` : `${f.t} autorisé le ${dateFr(f.da)} · ${CHANTIER_NOM[chantier(f)]}`}</small><br>
       <button data-ouvrir="${echapper(f.id)}">Ouvrir la fiche</button>`);
     points.push(m);
   }
@@ -355,7 +360,7 @@ document.querySelectorAll("#sources button").forEach((b) => b.addEventListener("
 }));
 function compterSources() {
   if (E.onglet === "suivi") return;
-  for (const src of ["permis", "ventes"]) {
+  for (const src of ["permis", "ventes", "dpe"]) {
     const n = filtrer(false, src).length;
     $(`#nb-${src}`).textContent = n.toLocaleString("fr-FR");
   }
@@ -414,6 +419,32 @@ function blocVente(f) {
     </div>`;
 }
 
+// Bloc « Diagnostic énergie » de la fiche (DPE ADEME)
+const REGLES_DPE = {
+  G: "Classe G : location interdite pour les nouveaux baux depuis 2025 → rénovation énergétique obligatoire pour louer.",
+  F: "Classe F : location interdite à partir de 2028 → travaux de rénovation à prévoir.",
+  E: "Classe E : location interdite à partir de 2034 ; travaux conseillés.",
+  D: "",
+};
+function blocDPE(f) {
+  const lies = (f.lies || []).map((id) => E.permis.find((x) => x.id === id)).filter(Boolean);
+  return `<div class="bloc">
+      <h3>⚡ Diagnostic énergie</h3>
+      ${ligne("Réalisé le", dateFr(f.da))}
+      ${ligne("Étiquette énergie", `<span class="etq etq-${f.etq}">${f.etq}</span>`)}
+      ${ligne("Étiquette climat (GES)", f.ges || "")}
+      ${ligne("Construite", f.an ? String(f.an) : echapper(f.per || ""))}
+      ${ligne("Surface", f.sb ? `${f.sb} m²` : "")}
+      ${ligne("Niveaux", f.niv ? String(f.niv) : "")}
+      ${ligne("Chauffage", echapper(f.chauf || ""))}
+      ${ligne("Isolation", echapper(f.iso || ""))}
+      ${ligne("Énergie par an", f.cout ? euros(f.cout) : "")}
+      ${REGLES_DPE[f.etq] ? `<div class="remarque">⚠️ ${REGLES_DPE[f.etq]}</div>` : ""}
+      <div class="remarque">💡 Un DPE récent est souvent fait juste avant une <b>vente</b> ou une <b>location</b>.</div>
+      ${lies.map((p) => `<div class="remarque">🔗 Même adresse : <a href="#" data-lien="${echapper(p.id)}">${echapper(libelle(p))} (${dateFr(p.da)})</a></div>`).join("")}
+    </div>`;
+}
+
 function ouvrirFiche(id) {
   const f = E.permis.find((x) => x.id === id);
   if (!f) return;
@@ -431,7 +462,7 @@ function ouvrirFiche(id) {
     <div class="fiche-tete">
       <div><span class="badge ${f.t}">${f.t}</span> ${estNouveau(f) ? '<span class="nouveau">NOUVEAU</span>' : ""}
         <h2>${echapper(libelle(f))}</h2>
-        <div class="sous-titre">${f.src === "V" ? `Vente du ${dateFr(f.da)} (DVF)` : `${TYPES[f.t] || f.t} n° ${echapper(f.num)}`}</div></div>
+        <div class="sous-titre">${f.src === "V" ? `Vente du ${dateFr(f.da)} (DVF)` : f.src === "E" ? `Diagnostic énergie du ${dateFr(f.da)} (ADEME)` : `${TYPES[f.t] || f.t} n° ${echapper(f.num)}`}</div></div>
       <button class="fermer" id="fermer-fiche" aria-label="Fermer">✕</button>
     </div>
 
@@ -473,9 +504,10 @@ function ouvrirFiche(id) {
     </div>
 
     ${f.src === "V" ? blocVente(f) : ""}
+    ${f.src === "E" ? blocDPE(f) : ""}
     ${f.achat ? `<div class="bloc"><h3>🏠 Bien acheté avant ce projet</h3>${ligne("Acheté le", dateFr(f.achat.d))}${ligne("Prix", euros(f.achat.prix))}<div class="remarque">Le propriétaire vient d'acheter puis dépose ce dossier : il prépare des travaux.</div></div>` : ""}
 
-    <div class="bloc"${f.src === "V" ? " hidden" : ""}>
+    <div class="bloc"${f.src === "V" || f.src === "E" ? " hidden" : ""}>
       <h3>Projet</h3>
       ${ligne("Type", TYPES[f.t] || f.t)}
       ${f.dest && f.src.includes("N") ? ligne("Destination", DESTINATIONS[f.dest] || "") : ""}
@@ -488,7 +520,7 @@ function ouvrirFiche(id) {
       ${ligne("Résidence", { 1: "Principale", 2: "Secondaire" }[f.rp] || "")}
     </div>
 
-    <div class="bloc"${f.src === "V" ? " hidden" : ""}>
+    <div class="bloc"${f.src === "V" || f.src === "E" ? " hidden" : ""}>
       <h3>Calendrier</h3>
       ${ligne("État", `<span class="etat ${ch}">${CHANTIER_NOM[ch]}</span>`)}
       ${ligne("Autorisé le", dateFr(f.da))}
@@ -498,12 +530,12 @@ function ouvrirFiche(id) {
     </div>
 
     <div class="bloc">
-      <h3>${f.src === "V" ? "Acheteur" : "Demandeur"}</h3>
+      <h3>${{ V: "Acheteur", E: "Propriétaire" }[f.src] || "Demandeur"}</h3>
       ${f.dem
         ? `${ligne("Société", echapper(f.dem))}${ligne("Dirigeant", echapper(f.ent?.dir || ""))}${ligne("Siège", echapper(joli(f.ent?.adr || "")))}${f.ent && f.ent.actif === false ? '<div class="remarque">⚠️ Société fermée selon l\'annuaire.</div>' : ""}${ligne("SIRET", f.siret ? `<a href="https://annuaire-entreprises.data.gouv.fr/etablissement/${echapper(f.siret)}" target="_blank" rel="noopener">${echapper(f.siret)}</a>` : "")}
            <div class="actions"><a class="secondaire" href="https://www.google.com/search?q=${encodeURIComponent((f.ent?.nom || f.dem) + " " + (f.dville || "") + " téléphone")}" target="_blank" rel="noopener">🔎 Trouver le téléphone</a>
            ${f.ent?.dir ? `<a class="secondaire" href="https://www.google.com/search?q=${encodeURIComponent(f.ent.dir.replace(/\s*\(.*\)$/, "") + " " + (f.ent?.nom || f.dem))}" target="_blank" rel="noopener">🔎 Le dirigeant</a>` : ""}</div>`
-        : ligne(f.src === "V" ? "Nom" : "Demandeur", f.src === "V" ? "Non publié" : "Particulier (nom non publié)")}
+        : ligne(f.src === "V" || f.src === "E" ? "Nom" : "Demandeur", f.src === "V" || f.src === "E" ? "Non publié" : "Particulier (nom non publié)")}
       ${ligne("Domicile", echapper([f.dcp, joli(f.dville)].filter(Boolean).join(" ")))}
       ${!f.dem && autreVille ? '<div class="remarque">💡 Habite une autre commune que celle du chantier : sans doute un nouvel arrivant.</div>' : ""}
     </div>
@@ -569,7 +601,7 @@ function exporter() {
   const entetes = ["Intérêt HO", "Points", "Distance de Toul (km)", "À proposer", "Numéro", "Type", "Projet", "Autorisé le", "État du chantier", "Chantier ouvert le", "Terminé le",
     "Logements créés", "Surface habitable créée (m²)", "Surface d'activité créée (m²)", "Comprend",
     "Adresse", "Lieu-dit", "Code postal", "Commune", "Département", "Demandeur", "SIRET",
-    "Domicile du demandeur", "Prix de vente (€)", "Prix au m² (€)", "Écart / moyenne commune (%)", "Dirigeant", "Siège de la société", "Parcelles", "Terrain (m²)", "Latitude", "Longitude", "Nouveau", "Statut", "Note", "Suivi mis à jour"];
+    "Domicile du demandeur", "Étiquette DPE", "Prix de vente (€)", "Prix au m² (€)", "Écart / moyenne commune (%)", "Dirigeant", "Siège de la société", "Parcelles", "Terrain (m²)", "Latitude", "Longitude", "Nouveau", "Statut", "Note", "Suivi mis à jour"];
   const cellule = (v) => {
     const s = String(v ?? "");
     return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -581,7 +613,7 @@ function exporter() {
       f.num, TYPES[f.t] || f.t, libelle(f), dateFr(f.da), CHANTIER_NOM[chantier(f)], dateFr(f.dd), dateFr(f.df),
       f.lg || "", f.sh || "", f.sl || "", (f.opt || []).map((o) => OPTIONS[o]).join(", "),
       joli(f.adr), joli(f.ld), f.cp, joli(f.ville), f.dep, f.dem || "Particulier", f.siret,
-      [f.dcp, joli(f.dville)].filter(Boolean).join(" "), f.prix || "", f.pm2 || "", f.ratio ? Math.round((f.ratio - 1) * 100) : "", f.ent?.dir || "", f.ent?.adr || "", (f.cad || []).join(", "), f.st || "",
+      [f.dcp, joli(f.dville)].filter(Boolean).join(" "), f.etq || "", f.prix || "", f.pm2 || "", f.ratio ? Math.round((f.ratio - 1) * 100) : "", f.ent?.dir || "", f.ent?.adr || "", (f.cad || []).join(", "), f.st || "",
       f.lat ?? "", f.lon ?? "", estNouveau(f) ? "oui" : "", STATUTS[s.s]?.nom || "", s.n || "", s.m ? dateFr(s.m) : ""]
       .map(cellule).join(";");
   });
@@ -654,7 +686,8 @@ async function demarrer() {
     }
     $("#infos-donnees").textContent =
       `${E.permis.length.toLocaleString("fr-FR")} prospects · permis jusqu'au ${dateFr(E.donnees.derniere_autorisation)}` +
-      (E.donnees.derniere_vente ? ` · ventes jusqu'au ${dateFr(E.donnees.derniere_vente)}` : "") + ` · mis à jour le ${dateFr(E.donnees.maj)}`;
+      (E.donnees.derniere_vente ? ` · ventes jusqu'au ${dateFr(E.donnees.derniere_vente)}` : "") +
+      (E.donnees.dernier_dpe ? ` · DPE jusqu'au ${dateFr(E.donnees.dernier_dpe)}` : "") + ` · mis à jour le ${dateFr(E.donnees.maj)}`;
     $("#recherche").value = E.filtres.q;
     dessinerFiltres();
     rafraichir();

@@ -187,8 +187,8 @@ main { padding: 0 16px 24px; }
 .bloc { background: var(--carte); border-radius: 14px; padding: 12px; margin-top: 10px; border: 1px solid var(--bord); }
 .bloc h3 { margin: 0 0 8px; font-size: 13px; color: var(--gris); text-transform: uppercase; letter-spacing: .03em; }
 .ligne { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
-.ligne span:first-child { color: var(--gris); }
-.ligne span:last-child { text-align: right; }
+.ligne > span:first-child { color: var(--gris); }
+.ligne > span:last-child { text-align: right; }
 .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
 .actions a, .actions button { font-size: 14px; }
 .remarque { font-size: 13px; color: var(--gris); margin-top: 6px; }
@@ -269,5 +269,12 @@ body.mode-courriers #courriers { display: block; }
 /* ----- Choix rapide Tout / Permis / Ventes ----- */
 .sources { display: flex; margin: 0 16px 8px; padding: 3px; gap: 3px; background: var(--carte); border: 1px solid var(--bord); border-radius: 12px; }
 .sources button { flex: 1; border: 0; background: transparent; border-radius: 9px; padding: 8px 4px; font-weight: 600; font-size: 14px; }
-.sources button small { font-weight: 500; opacity: .75; font-size: 12px; }
+.sources button small { display: block; font-weight: 500; opacity: .75; font-size: 11px; }
 .sources button.actif { background: var(--bleu); color: var(--sur-bleu); }
+
+/* ----- Étiquettes DPE (couleurs officielles) ----- */
+.etq { font-weight: 800; padding: 1px 7px; border-radius: 6px; color: #fff; }
+.etq-A { background: #009c6d; } .etq-B { background: #52b153; } .etq-C { background: #78bd76; color: #111; }
+.etq-D { background: #f4e70f; color: #111; } .etq-E { background: #f0b40f; color: #111; }
+.etq-F { background: #eb8235; } .etq-G { background: #d7221f; }
+.badge.DPE { background: #fef3c7; color: #92400e; }

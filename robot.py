@@ -26,6 +26,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from dpe import lier_dpe, lire_dpe
 from ventes import lier_ventes_permis, lire_ventes
 
 # ---------------------------------------------------------------------------
@@ -387,6 +388,15 @@ def main():
         log(f"  ⚠️ Ventes DVF indisponibles : {e}")
         ventes, derniere_vente = [], ""
 
+    # Diagnostics énergie récents (DPE) : 3e source de prospects
+    try:
+        log("\n== DPE récents (ADEME)")
+        dpes, dernier_dpe = lire_dpe()
+        lier_dpe(dpes, fiches + ventes)
+    except Exception as e:  # noqa: BLE001 - le reste est publié même si l'API DPE est en panne
+        log(f"  ⚠️ DPE indisponibles : {e}")
+        dpes, dernier_dpe = [], ""
+
     # Date de première apparition (pour les « nouveautés »)
     vus = charger(VUS, {})
     premiere_fois = not vus
@@ -397,17 +407,23 @@ def main():
     for v in ventes:
         v["vu"] = vus.setdefault(v["id"], v["da"] if premieres_ventes else aujourd_hui.isoformat())
     fiches += sorted(ventes, key=lambda v: v["da"], reverse=True)
+    # 1re fois que les DPE arrivent : idem
+    premiers_dpe = not any(k.startswith("E") for k in vus)
+    for d in dpes:
+        d["vu"] = vus.setdefault(d["id"], d["da"] if premiers_dpe else aujourd_hui.isoformat())
+    fiches += sorted(dpes, key=lambda d: d["da"], reverse=True)
     ids = {f["id"] for f in fiches}
     ecrire(VUS, {k: v for k, v in vus.items() if k in ids})
 
     # (certaines dates saisies sont dans le futur : on les ignore pour la date affichée)
-    dates = sorted(f["da"] for f in fiches if f.get("da") and f["da"] <= aujourd_hui.isoformat() and f["src"] != "V")
+    dates = sorted(f["da"] for f in fiches if f.get("da") and f["da"] <= aujourd_hui.isoformat() and f["src"] not in ("V", "E"))
     resultat = {
         "maj": aujourd_hui.isoformat(),
         "depuis": limite,
         "derniere_autorisation": dates[-1] if dates else "",
         "premier_passage": premiere_fois,
         "derniere_vente": derniere_vente,
+        "dernier_dpe": dernier_dpe,
         "permis": fiches,
     }
     ecrire(SORTIE, resultat, compact=True)
@@ -425,7 +441,8 @@ def main():
                     f"- Par type : {par_type}\n- Nouveaux aujourd'hui : {nouveaux}\n"
                     f"- Dernière autorisation dans les données : {resultat['derniere_autorisation']}\n"
                     f"- Placés sur la carte : {sum(1 for f in fiches if 'lat' in f)}\n"
-                    f"- Ventes DVF (maisons + locaux) : {len(ventes)} (jusqu'au {derniere_vente or '—'})\n")
+                    f"- Ventes DVF (maisons + locaux) : {len(ventes)} (jusqu'au {derniere_vente or '—'})\n"
+                    f"- DPE récents (maisons D à G) : {len(dpes)} (jusqu'au {dernier_dpe or '—'})\n")
 
 
 if __name__ == "__main__":
