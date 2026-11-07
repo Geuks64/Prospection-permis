@@ -26,9 +26,23 @@ def lire(url):
         return r.read()
 
 
-index = lire(BASE).decode("utf-8", "replace")
-annees = sorted(set(re.findall(r'href="(\d{4})/"', index)))
-dire(f"# Test DVF\n\nAnnées disponibles : {annees}\n")
+dire("# Test DVF\n")
+try:
+    index = lire(BASE).decode("utf-8", "replace")
+    dire("Début de la page d'index :\n```\n" + index[:1500] + "\n```")
+except Exception as e:  # noqa: BLE001
+    dire(f"Index illisible : {e}")
+# On essaie directement les années récentes (fichier du 54)
+annees = []
+for an in range(2027, 2018, -1):
+    try:
+        req = urllib.request.Request(f"{BASE}{an}/departements/54.csv.gz", headers=UA, method="HEAD")
+        urllib.request.urlopen(req, timeout=60)
+        annees.append(str(an))
+    except Exception as e:  # noqa: BLE001
+        dire(f"- {an} : {e}")
+annees.sort()
+dire(f"\nAnnées disponibles : {annees}\n")
 for dep in ["54", "55", "57", "88"]:
     dire(f"## Département {dep}")
     for an in annees[-2:]:
