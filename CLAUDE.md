@@ -71,7 +71,7 @@ avec carte, suivi des prospects, nouveautés, courriers à imprimer et export Ex
     défaut, type, projet, chantier, options, période, statut, tri), fiche (suivi, itinéraire
     Plans/Google, Street View, Géoportail cadastre, annuaire entreprises), carte Leaflet +
     markercluster (cdnjs), bandeau nouveautés, export CSV `;` + BOM.
-  - URL attendue : https://prospection-permis.volkan-fener-54.workers.dev
+  - URL : https://hodemolition.volkan-fener-54.workers.dev (Worker renommé « hodemolition » le 2026-11-07 ; l'ancien Worker « prospection-permis » peut être supprimé)
 - **Personnalisation HO Démolition (2026-11-07)** — l'utilisateur final est le patron de
   HO Démolition (Toul 54200, 06 49 85 96 54, hodemolition@gmail.com), lui-même apporteur
   d'affaires : métier principal débarras / curage / nettoyage, + mise en relation avec des

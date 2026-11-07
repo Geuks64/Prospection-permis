@@ -1,5 +1,5 @@
 # Configuration du Worker Cloudflare (le "serveur" de l'appli).
-name = "prospection-permis"
+name = "hodemolition"
 main = "src/index.ts"
 compatibility_date = "2026-10-01"
 
@@ -10,7 +10,7 @@ directory = "./public"
 binding = "ASSETS"
 run_worker_first = true
 
-# Journaux visibles dans le tableau de bord Cloudflare (Workers > prospection-permis > Logs)
+# Journaux visibles dans le tableau de bord Cloudflare (Workers > hodemolition > Logs)
 [observability]
 enabled = true
 
