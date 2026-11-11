@@ -27,6 +27,14 @@ avec carte, suivi des prospects, nouveautés, courriers à imprimer et export Ex
 
 ## État en cours
 
+> **Résumé pour reprendre (2026-11-11)** : tout est en ligne et fonctionne — appli
+> https://hodemolition.pages.dev (Cloudflare Pages, compte volkan.fener.54), dépôt GitHub
+> `Geuks64/Prospection-permis` (privé), robot chaque lundi, rapport interne chaque matin
+> (Issues `rapport-auto`). Secrets GitHub nécessaires : `CLOUDFLARE_API_TOKEN`,
+> `CLOUDFLARE_ACCOUNT_ID`, `APP_PASSWORD`. Prochaine étape : retours d'usage du patron de HO
+> (lire les Issues `rapport-auto`). Idées en attente : devis express débarras, artisans +
+> commissions, marchés publics BOAMP, BODACC, QR code « demande de devis », notifications.
+
 - Plan : étape 0 = test des données (`test_donnees.py` + `test-donnees.yml`) ; étape 1 = robot
   mensuel (filtre 4 départements, 12 mois, géocodage) ; étape 2 = appli Cloudflare ;
   étape 3 = courriers.
@@ -54,13 +62,13 @@ avec carte, suivi des prospects, nouveautés, courriers à imprimer et export Ex
   - Les DP sans création de surface (piscine seule, clôture, ravalement) ne sont PAS dans Sitadel.
 - Secrets GitHub en place (2026-11-07) : `CLOUDFLARE_API_TOKEN` (token « prospection-permis »,
   modèle Edit Cloudflare Workers, compte volkan.fener.54), `CLOUDFLARE_ACCOUNT_ID`, `APP_PASSWORD`.
-- **Étapes 1 + 2 écrites (2026-11-07)**, premier déploiement + premier passage du robot en cours :
+- **Étapes 1 + 2 faites et en ligne (2026-11-07)** :
   - `robot.py` (stdlib) : 4 CSV DiDo → filtre 4 dép. + 365 j + hors annulés (état 4) → fiches
     compactes (clés courtes : id, src L/N/D/A, t, num, e, da/dd/df, adr, ld, cp, ville, dem, siret,
     dcp/dville, cad, st, nat, dest, tl, lg, sh, sl, ut, rp, niv, opt, lat/lon/geo a|r|c, vu) →
     géocodage IGN (`citycode` = INSEE, cache `donnees/geocache.json`) → `public/data/permis.json`.
     `donnees/vus.json` = date de 1re apparition (nouveautés).
-  - `.github/workflows/robot.yml` : cron le 2 et le 16 à 05:17 UTC + manuel ; commit des données
+  - `.github/workflows/robot.yml` : cron **chaque lundi** 05:17 UTC + manuel ; commit des données
     puis appel de `deploy.yml` (workflow_call).
   - `.github/workflows/deploy.yml` : push main / manuel / appel ; crée le KV
     `prospection-permis-suivi` (binding `SUIVI`), crée le projet Pages `hodemolition` si besoin,
@@ -68,10 +76,10 @@ avec carte, suivi des prospects, nouveautés, courriers à imprimer et export Ex
   - Worker `src/index.ts` (+ `src/connexion.ts` = page mot de passe) : cookie de session HMAC
     (180 j), `GET/POST /api/suivi` (KV clé `suivi` = {id: {s, n, m}}), `POST /api/vue` (KV clé
     `vue` = date `maj` des données vues), fichiers `public/` servis via `ASSETS` (run_worker_first).
-  - Appli `public/index.html` + `app.js` + `style.css` : liste, filtres (dép., particuliers par
-    défaut, type, projet, chantier, options, période, statut, tri), fiche (suivi, itinéraire
+  - Appli `public/index.html` + `app.js` + `style.css` : liste, filtres (dép., particuliers + sociétés
+    par défaut, type, projet, chantier, options, période, statut, tri), fiche (suivi, itinéraire
     Plans/Google, Street View, Géoportail cadastre, annuaire entreprises), carte Leaflet +
-    markercluster (cdnjs), bandeau nouveautés, export CSV `;` + BOM.
+    markercluster (hébergés dans `public/lib/leaflet/`), bandeau nouveautés, export CSV `;` + BOM.
   - URL : **https://hodemolition.pages.dev** — hébergé en **Cloudflare Pages** (mode avancé :
     `src/index.ts` compilé par esbuild en `public/_worker.js` au déploiement, non versionné) et non
     plus en Worker, pour que l'adresse ne contienne pas « volkan-fener-54 » (le sous-domaine
