@@ -401,12 +401,6 @@
 "dir": "",
 "nom": "COMMUNAUTE DE COMMUNES SARREBOURG MOSELLE SUD (CCSMS)"
 },
-"200068369": {
-"actif": true,
-"adr": "32 RUE DU GENERAL LECLERC 88500 MIRECOURT",
-"dir": "",
-"nom": "CC DE MIRECOURT DOMPAIRE"
-},
 "200068559": {
 "actif": true,
 "adr": "2 B AVENUE FRANCOIS DE NEUFCHATEAU 88300 NEUFCHATEAU",
@@ -502,12 +496,6 @@
 "adr": "35 B RUE ETIENNE OLRY 54170 ALLAIN",
 "dir": "",
 "nom": "COMMUNE D ALLAIN"
-},
-"215400391": {
-"actif": true,
-"adr": "2 RUE ADRIEN MICHAUT 54120 BACCARAT",
-"dir": "",
-"nom": "COMMUNE DE BACCARAT"
 },
 "215400540": {
 "actif": true,
@@ -610,12 +598,6 @@
 "adr": "8 GRANDE RUE 54850 MEREVILLE",
 "dir": "",
 "nom": "COMMUNE DE MEREVILLE"
-},
-"215403734": {
-"actif": true,
-"adr": "8 RUE DE LA FOURASSE 54300 MONCEL-LES-LUNEVILLE",
-"dir": "",
-"nom": "COMMUNE DE MONCEL LES LUNEVILLE"
 },
 "215403791": {
 "actif": true,
@@ -2723,12 +2705,6 @@
 "dir": "Francis BRIET (BRIET) (Directeur Général)",
 "nom": "EAGLE INDUSTRY FRANCE (EKK ET EIF)"
 },
-"419314778": {
-"actif": true,
-"adr": "6 RUE DU CHATEAU 54770 BOUXIERES-AUX-CHENES",
-"dir": "Dominique BOUR (BOUR) (Gérant et associé indéfiniment responsable)",
-"nom": "FERM'INDUS"
-},
 "420154163": {
 "actif": true,
 "adr": "BEVILLE 57530 GLATIGNY",
@@ -3107,12 +3083,6 @@
 "dir": "Xavier FRANCOIS (Gérant)",
 "nom": "EARL DU PONCET"
 },
-"445150006": {
-"actif": true,
-"adr": "MR KILICPARLAR MUSTAFA 2 RUE DE PORCELETTE 57890 DIESEN",
-"dir": "Dilara KILICPARLAR (Associé indéfiniment responsable)",
-"nom": "SCI KILIC"
-},
 "445184302": {
 "actif": true,
 "adr": "15 RUE DE LA MONTAGNE 68100 MULHOUSE",
@@ -3352,12 +3322,6 @@
 "adr": "23 RUE PRINCIPALE 57580 FLOCOURT",
 "dir": "Christian VIVILLE (Gérant)",
 "nom": "SCI MAJU"
-},
-"478999956": {
-"actif": true,
-"adr": "24 GRAND RUE 57650 HAVANGE",
-"dir": "Pascal BRIER (Gérant)",
-"nom": "GFA DU PLATEAU"
 },
 "479444515": {
 "actif": true,
@@ -4001,12 +3965,6 @@
 "dir": "Hidir TARHAN (Gérant et associé indéfiniment responsable)",
 "nom": "ETHAN SARL"
 },
-"521528141": {
-"actif": true,
-"adr": "GRANGES-SUR-VOLOGNE 1 CHEMIN DU HAUT RAIN 88640 GRANGES-AUMONTZEY",
-"dir": "Rudi CLAUDEL (Gérant)",
-"nom": "LE MONTANA"
-},
 "522188044": {
 "actif": true,
 "adr": "2 RUE JULES FERRY 88160 LE THILLOT",
@@ -4390,12 +4348,6 @@
 "adr": "31 RUE JEAN WENGER-VALENTIN 67000 STRASBOURG",
 "dir": "Alexandre ARGIOLAS (Administrateur)",
 "nom": "BANQUE CIC EST (CIC EST)"
-},
-"761800119": {
-"actif": true,
-"adr": "1 RUE JACQUES VILLERMAUX 54000 NANCY",
-"dir": "Thomas DEON (DEON) (Administrateur)",
-"nom": "SUD LORRAINE INGENIERIE MUTUALISEE PROJETS (SLIM PROJETS)"
 },
 "775614837": {
 "actif": true,
@@ -5279,12 +5231,6 @@
 "dir": "Christophe LECOMTE (Directeur Général)",
 "nom": "METHA DES DEUX NIED"
 },
-"831685078": {
-"actif": true,
-"adr": "17 RUE DU GENERAL DE GAULLE 54770 BOUXIERES-AUX-CHENES",
-"dir": "Mathieu CLAUDE (Gérant)",
-"nom": "FLUID'EST"
-},
 "832111454": {
 "actif": true,
 "adr": "2 RUE DES IRIS 55430 BELLEVILLE-SUR-MEUSE",
@@ -5452,12 +5398,6 @@
 "adr": "24 RUE DE LORRAINE 57915 WOUSTVILLER",
 "dir": "Antonio D'ASCOLI (Président de SAS)",
 "nom": "LOTISS-EST"
-},
-"840620165": {
-"actif": true,
-"adr": "38 RUE DE SEREMANGE 57290 FAMECK",
-"dir": "Cihangir YILDIZ (Associé indéfiniment responsable)",
-"nom": "YILDIZ YALCIN ET FRERES"
 },
 "841026685": {
 "actif": true,
@@ -6143,12 +6083,6 @@
 "dir": "Julien FERREIRA (Gérant)",
 "nom": "L2MP"
 },
-"893704197": {
-"actif": true,
-"adr": "40 RUE DE LA PLATRERIE 57410 ROHRBACH-LES-BITCHE",
-"dir": "Lisa LADWEIN (Associé indéfiniment responsable)",
-"nom": "PAMELITH"
-},
 "893894295": {
 "actif": true,
 "adr": "48 RUE AUNETTE 57120 ROMBAS",
@@ -6353,12 +6287,6 @@
 "dir": "Louis DU PASQUIER (Président de SAS)",
 "nom": "EASY CHARGE SERVICES"
 },
-"901923037": {
-"actif": true,
-"adr": "10-12 10 PLACE VENDOME 75001 PARIS",
-"dir": "",
-"nom": "EUROPEAN HOMES 219"
-},
 "902280197": {
 "actif": true,
 "adr": "30 CORVEE ROHARD 54160 PULLIGNY",
@@ -6388,12 +6316,6 @@
 "adr": "17 RUE LOUIS BLERIOT 73100 AIX-LES-BAINS",
 "dir": "Gaelle DIDIER (Gérant et associé indéfiniment responsable)",
 "nom": "IMMO'Z"
-},
-"903131589": {
-"actif": true,
-"adr": "21 RUE DU GENERAL DE GAULLE 54770 BOUXIERES-AUX-CHENES",
-"dir": "Corey PUMONT (Gérant)",
-"nom": "LDC ASSOCIES"
 },
 "903173094": {
 "actif": true,
@@ -6610,12 +6532,6 @@
 "adr": "102 ROUTE DE LORRY 57420 LORRY-MARDIGNY",
 "dir": "Emilie BARBIER (Gérant)",
 "nom": "GROUPEMENT AGRICOLE D'EXPLOITATION EN COMMUN REMILIE (GAEC REMILIE)"
-},
-"913083945": {
-"actif": true,
-"adr": "24 ROUTE DU THOLY 88640 GRANGES-AUMONTZEY",
-"dir": "Frederic LEONARDI (Gérant et associé indéfiniment responsable)",
-"nom": "JO ET FRED"
 },
 "913293171": {
 "actif": true,
@@ -6964,12 +6880,6 @@
 "adr": "10 RUE DES VERGERS 57450 HENRIVILLE",
 "dir": "Melody HOUPERT (Associé indéfiniment responsable)",
 "nom": "SCI MSCR"
-},
-"930150206": {
-"actif": true,
-"adr": "26 AVENUE DE LA LIBERATION 55000 BAR-LE-DUC",
-"dir": "Chloe BOURGUIGNON (Gérant et associé indéfiniment responsable)",
-"nom": "CLOE"
 },
 "930163829": {
 "actif": true,
@@ -7871,12 +7781,6 @@
 "dir": "Mickaël MARTINO (Gérant et associé indéfiniment responsable)",
 "nom": "LUCKY DUST"
 },
-"980747406": {
-"actif": true,
-"adr": "19 RUE DE GANDREN 57480 HAUTE-KONTZ",
-"dir": "Claire HAMELIN-BOYER (Gérant)",
-"nom": "EXPLOITATION AGRICOLE UNIPERSONNELLE A RESPONSABILITE LIMITEE CHB"
-},
 "980762843": {
 "actif": true,
 "adr": "22 GRANDE RUE 54210 VILLE-EN-VERMOIS",
@@ -8236,12 +8140,6 @@
 "adr": "10 RUE CLEMENCEAU 57360 AMNEVILLE",
 "dir": "Ali MECHERI (Président de SAS)",
 "nom": "LES COLOMBES"
-},
-"989846449": {
-"actif": true,
-"adr": "31 RUE BELLES FONTAINES 57730 VALMONT",
-"dir": "Carole BOOS (Gérant et associé indéfiniment responsable)",
-"nom": "GC IMMOBILIER"
 },
 "989874987": {
 "actif": true,
