@@ -165,3 +165,8 @@ avec carte, suivi des prospects, nouveautés, courriers à imprimer et export Ex
   tranches de 10 arrêts. Suivi enrichi côté Worker : `v` (passe|absent|flyer), `vd`, `r` (date de
   relance) ; fiche : visite + « Relancer le » (+1 sem., +1 mois) + ajout tournée ; onglet Suivi :
   relances du jour en premier + pastille rouge du nombre de relances ; `majSuivi(f, changements)`.
+## Fin de chaque travail (sur le PC ou depuis le téléphone)
+
+- Travailler directement sur la branche `main`. Si une autre branche a été créée, la fusionner dans `main` et l'envoyer sur GitHub avant de finir, sans attendre qu'on le demande.
+- Mettre à jour `progress.md` (le créer s'il n'existe pas) : où on en est, ce qui a été décidé, la prochaine étape, avec la date. Le dire en une ligne.
+- Répondre en français, simplement, sans jargon : l'utilisateur n'est pas développeur.
