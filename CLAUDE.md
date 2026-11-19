@@ -7,7 +7,7 @@ avec carte, suivi des prospects, nouveautés, courriers à imprimer et export Ex
 
 - Travailler directement sur `main` (pas de nouvelle branche sauf demande explicite).
 - Code commenté en français, simple à lire.
-- L'utilisateur n'a pas de PC : tout se lance via GitHub Actions (workflows manuels depuis l'iPhone).
+- L'utilisateur a un PC Windows, mais travaille souvent depuis l'iPhone : tout doit pouvoir se lancer via GitHub Actions (workflows manuels depuis l'iPhone).
 - Le conteneur de développement Claude ne peut PAS joindre data.gouv.fr : tout test de données
   passe par un workflow GitHub Actions.
 - Ne jamais journaliser de secret (token Cloudflare, mot de passe de l'appli).
